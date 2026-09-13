@@ -7,7 +7,8 @@ single run's roster as canonical.
 ## How to use this log
 
 1. Copy the prompt from the step you need.
-2. Replace placeholders (`<GITHUB_ORG>`, `<ROOT_REPO>`, `<MODULE_REPOS>`, and the rest).
+2. Replace placeholders (`<GITHUB_ORG>`, `<ROOT_REPO>`, `<MODULE_REPOS>`, `<CI_REPO>`,
+   `<CI_REF>`, and the rest).
 3. After you finish a new step in this sandbox, append the next numbered section here.
    Neighbouring agents must do that without being asked (see `.cursor/rules/monorepoisation.mdc`).
 
@@ -270,5 +271,193 @@ Commit the deployed `.cursor/`, `.claude/`, `AGENTS.md`, and `apm.lock.yaml` tre
 ## Do not
 
 - Change Dockerfiles, `go.work`, or GitHub Actions in this step.
+````
+
+### 5. Wire Go workspaces and Docker build context
+
+**Summary:** Add a root `go.work` that lists every Go module. Each service `go.mod` gets a
+`replace` that points at `qubership-apihub-commons-go` on the same branch. Dockerfiles for backend,
+agents-backend, and the linter copy commons-go from the monorepo root (`GOWORK=off` so the image
+build uses `replace`, not the workspace file). Image build context for those services is `.`.
+
+**Agent time (sandbox run):** about 20 minutes, dominated by `go work sync` / `go mod tidy`.
+
+**Prompt:**
+
+````markdown
+Use Go workspaces so services compile `qubership-apihub-commons-go` from this branch, and keep an
+independent publish life cycle for the library.
+
+## Requirements
+
+- Create `go.work` at the destination root with `use (` every Go module directory `)`.
+- In each service `go.mod` add
+  `replace github.com/Netcracker/qubership-apihub-commons-go => ../../qubership-apihub-commons-go`
+  (adjust `../` so it resolves from that `go.mod`).
+- Do not drop the `require` line; `replace` overrides it for in-repo builds.
+- Dockerfiles that build those services must `COPY` both the library and the service, set
+  `ENV GOWORK=off`, and use a build context of the destination root.
+- Leave npm-based Dockerfiles (UI, build-task-consumer) unchanged.
+- A later module tag `<commons-module>/<semver>` still publishes the library; services do not
+  `go get` that release for in-repo builds.
+
+## Verify
+
+- `go work sync` succeeds.
+- Each service `go.mod` contains the `replace` directive.
+- Backend / linter / agents-backend Dockerfiles copy `qubership-apihub-commons-go`.
+````
+
+### 6. Smart Docker CI in the CI store, thin wrapper in the monorepo
+
+**Summary:** Reusable workflow sources stay in `<CI_REPO>`. Added optional `image-tag`,
+`image-repository` on `docker-ci.yml` and `working-directory` on `frontend-ci.yaml`. New
+`monorepo-ci.yml` detects changed modules from `ci/modules.yaml`, builds only those images, and
+computes the branch/PR/tag image tag (module tags `module/1.2.3` publish as `1.2.3`). The destination
+root keeps a thin `.github/workflows/ci.yml` that `uses` that reusable.
+
+**Agent time (sandbox run):** about 40 minutes. Dominated by reusable workflow wiring.
+
+**Prompt:**
+
+````markdown
+Add smart Docker CI. Put reusable workflow *sources* in `<CI_REPO>`. The destination repo only gets
+a thin wrapper.
+
+## CI store (`<CI_REPO>`)
+
+- Keep existing `docker-ci.yml` behaviour. Add optional `image-tag` and `image-repository` inputs
+  (empty `image-repository` still publishes `ghcr.io/netcracker/<name>`).
+- Add optional `working-directory` to `frontend-ci.yaml` (default `.`).
+- Add `monorepo-ci.yml` that:
+  - checks out the caller and reads `<modules-file>` (default `ci/modules.yaml`)
+  - diffs against the PR base / previous push SHA / `develop`
+  - rebuilds only changed image modules
+  - rebuilds every Go image that lists `qubership-apihub-commons-go` when that library changes
+  - runs frontend-ci in the module folder before Docker for npm-pack images
+  - uses context `.` for Dockerfiles that copy commons-go
+- Helper scripts live under `<CI_REPO>/.github/workflows/scripts/`. The reusable checks that repo
+  out as `.ci-store` using inputs `ci-store-repository` and `ci-store-ref`.
+
+## Destination wrapper
+
+- `.github/workflows/ci.yml` calls
+  `<CI_REPO>/.github/workflows/monorepo-ci.yml@<CI_REF>` with `secrets: inherit`.
+- Pin `<CI_REF>` to the feature branch until the CI store PR merges, then switch to `main`.
+- `permissions.packages: write` is required so GHCR push works.
+
+## Verify
+
+- A PR that only touches `<ui-module>` does not run backend `docker-ci`.
+- A PR that touches commons-go rebuilds backend, linter, and agents-backend.
+````
+
+### 7. E2E compose and kind with image-tag fallback
+
+**Summary:** `run-e2e-tests.yml` and `run-e2e-tests-kind.yaml` gained `source-layout: monorepo`
+(checkout the caller once, symlink compose/helm/postman/playwright paths) and `image-refs-json`.
+Resolve logic: image built in this run, else GHCR tag for the current ref, else
+`ghcr.io/netcracker/<image>:dev`. Compose rewrites full image refs from that JSON. Kind writes a
+Helm values overlay (`image.repository` + `image.tag`) so sandbox GHCR namespaces work. E2E runs
+on pull requests when a runtime or test module changed.
+
+**Agent time (sandbox run):** about 25 minutes.
+
+**Prompt:**
+
+````markdown
+Keep compose and kind E2E. Take image tags from this branch; if a module was not built, fall back
+to `ghcr.io/netcracker/<image>:dev`.
+
+## CI store
+
+- Add `source-layout` (`polyrepo` default, `monorepo` checkouts the caller) plus `postman-path` and
+  `playwright-path` to both E2E reusables. Skip sibling-repo clones when `source-layout=monorepo`.
+- Add `image-refs-json`. When set, rewrite `ghcr.io/netcracker/<image>:<anything>` in compose to the
+  full ref from the JSON. For Kind, write a Helm values overlay with `image.repository` and
+  `image.tag` (do not pass full refs as `--set tag=`). Keep the old `--set-string …image.tag=` path
+  when `image-refs-json` is empty so polyrepo callers stay unchanged.
+- `monorepo-ci.yml` resolve step: this-run tag, else GHCR `<registry-owner>/<image>:<current-tag>`,
+  else `ghcr.io/netcracker/<image>:dev`.
+- Run compose and kind E2E on `pull_request` when detect says `e2e_needed`.
+
+## Destination
+
+- Do not duplicate E2E job YAML. The root `ci.yml` wrapper already enables both flags.
+- Keep the existing manual `run-e2e-tests.yml` / `run-e2e-tests-kind.yml` dispatch wrappers.
+
+## Verify
+
+- A UI-only PR builds the UI image and runs E2E with other services on `:dev` (or an existing
+  branch tag in GHCR).
+````
+
+### 8. Module tag release notes
+
+**Summary:** Pushing `<module>/<semver>` still runs smart Docker CI (step 6). A thin
+`module-release.yml` wrapper calls `monorepo-module-release.yml`, which writes GitHub Release notes
+from `git log` between the previous tag with that prefix and this one, scoped to the module path.
+Commons-go tags publish a GitHub Release for the library; services keep using workspace sources.
+
+**Agent time (sandbox run):** about 15 minutes.
+
+**Prompt:**
+
+````markdown
+Preserve per-module releases. A git tag `<module>/<semver>` builds that module and publishes
+release notes.
+
+## Requirements
+
+- Reusable `monorepo-module-release.yml` in `<CI_REPO>`: previous tag with the same prefix, `git log`
+  on the module path, `gh release create` with title equal to the prefixed tag.
+- Destination wrapper on `push.tags` for every image module and commons-go.
+- Do not copy personal GitHub tokens into the tree. Use `GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}`.
+- Commons-go keeps its own tag/release; in-repo services do not switch off `replace` / `go.work`.
+````
+
+### 9. Application release from a sprint name
+
+**Summary:** Manual `workflow_dispatch` with `sprint-name` calls `monorepo-app-release.yml`. It takes
+the latest `<ROOT_REPO>/<semver>` tag, bumps patch, creates an annotated tag, writes notes from
+`git log`, and packages the Helm chart onto that GitHub Release.
+
+**Agent time (sandbox run):** about 15 minutes.
+
+**Prompt:**
+
+````markdown
+Add a manual application release.
+
+## Requirements
+
+- `workflow_dispatch` input `sprint-name`.
+- Reusable in `<CI_REPO>` computes the next `<ROOT_REPO>/<semver>` (patch +1 on the previous
+  prefixed app tag, or `0.1.0` if none).
+- Create an annotated git tag, push it, create a GitHub Release, include the sprint name in the
+  body, and attach a packaged Helm chart (see step 10).
+- Do not store a GitHub token in the repository.
+````
+
+### 10. Publish the Helm chart to GHCR OCI
+
+**Summary:** `helm package` + `helm push oci://ghcr.io/<owner>/charts`. The app-release reusable
+does this on every application tag. A separate `publish-helm-chart.yml` wrapper allows a manual
+chart-only publish.
+
+**Agent time (sandbox run):** about 10 minutes.
+
+**Prompt:**
+
+````markdown
+Publish the umbrella Helm chart instead of asking users to copy it from a git tag.
+
+## Requirements
+
+- Reusable `publish-helm-chart.yml` in `<CI_REPO>`: `helm package` `<chart-path>` with the given
+  version, `helm push` to `oci://ghcr.io/<owner>/charts`, optional `gh release upload`.
+- Call it from the application release (step 9) and from a destination `workflow_dispatch` wrapper.
+- Chart path defaults to `helm-templates/qubership-apihub`.
+- `permissions.packages: write` is required.
 ````
 

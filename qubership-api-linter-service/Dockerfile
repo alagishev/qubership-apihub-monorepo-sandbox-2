@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# Note: this uses host platform for the build, and we ask go build to target the needed platform, so we do not spend time on qemu emulation when running "go build"
+# Build context is the monorepo root so commons-go is copied from the same branch.
 FROM --platform=$BUILDPLATFORM docker.io/golang:1.26.5-alpine3.23 AS builder
 ARG BUILDPLATFORM
 ARG TARGETOS
@@ -20,12 +20,14 @@ ARG TARGETARCH
 
 WORKDIR /workspace
 
-COPY qubership-api-linter-service ./qubership-api-linter-service
+COPY qubership-apihub-commons-go qubership-apihub-commons-go
+COPY qubership-api-linter-service/qubership-api-linter-service ./qubership-api-linter-service/qubership-api-linter-service
 
-WORKDIR /workspace/qubership-api-linter-service
+WORKDIR /workspace/qubership-api-linter-service/qubership-api-linter-service
 
 SHELL ["/bin/ash", "-eo", "pipefail", "-c"]
 
+ENV GOWORK=off
 RUN if env | grep -Eiq '^(http|https|all)_proxy=https?://https?://'; then unset HTTP_PROXY HTTPS_PROXY ALL_PROXY http_proxy https_proxy all_proxy; fi; \
     go run ./tools/download-linter-tools -os=${TARGETOS} -arch=${TARGETARCH}
 RUN if env | grep -Eiq '^(http|https|all)_proxy=https?://https?://'; then unset HTTP_PROXY HTTPS_PROXY ALL_PROXY http_proxy https_proxy all_proxy; fi; \
@@ -42,11 +44,10 @@ ENV SPECTRAL_BIN_PATH=resources/spectral/linux/spectral
 
 WORKDIR /app/qubership-api-linter-service
 
-COPY --chown=10001:0 --chmod=555 --from=builder /workspace/qubership-api-linter-service/qubership-api-linter-service ./qubership-api-linter-service
-COPY --chown=10001:0 --chmod=555 --from=builder /workspace/qubership-api-linter-service/resources ./resources
-COPY --chown=10001:0 --chmod=555 docs/api ./api
+COPY --chown=10001:0 --chmod=555 --from=builder /workspace/qubership-api-linter-service/qubership-api-linter-service/qubership-api-linter-service ./qubership-api-linter-service
+COPY --chown=10001:0 --chmod=555 --from=builder /workspace/qubership-api-linter-service/qubership-api-linter-service/resources ./resources
+COPY --chown=10001:0 --chmod=555 qubership-api-linter-service/docs/api ./api
 
 USER 10001:10001
 
 CMD ["./qubership-api-linter-service"]
-

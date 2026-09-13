@@ -1,4 +1,18 @@
-# Note: this uses host platform for the build, and we ask go build to target the needed platform, so we do not spend time on qemu emulation when running "go build"
+# Copyright 2024-2025 NetCracker Technology Corporation
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+# Build context is the monorepo root so commons-go is copied from the same branch.
 FROM --platform=$BUILDPLATFORM docker.io/golang:1.26.5-alpine3.23 AS builder
 ARG BUILDPLATFORM
 ARG TARGETOS
@@ -6,10 +20,12 @@ ARG TARGETARCH
 
 WORKDIR /workspace
 
-COPY qubership-apihub-service qubership-apihub-service
+COPY qubership-apihub-commons-go qubership-apihub-commons-go
+COPY qubership-apihub-backend/qubership-apihub-service qubership-apihub-backend/qubership-apihub-service
 
-WORKDIR /workspace/qubership-apihub-service
+WORKDIR /workspace/qubership-apihub-backend/qubership-apihub-service
 
+ENV GOWORK=off
 RUN GOSUMDB=off CGO_ENABLED=0 go mod tidy && go mod download && GOOS=${TARGETOS} GOARCH=${TARGETARCH} go build .
 
 FROM ghcr.io/netcracker/qubership-core-base:2.3.7@sha256:b917b3a1731a2ae26b507d22565f030ec25ff8d28b75a80b8b08bbc946f4d73b
@@ -22,12 +38,11 @@ ENV GIT_HASH=$GIT_HASH
 
 WORKDIR /app/qubership-apihub-service
 
-COPY --chown=10001:0 --chmod=555 --from=builder /workspace/qubership-apihub-service/qubership-apihub-service ./qubership-apihub-service
-COPY --chown=10001:0 --chmod=555 qubership-apihub-service/static ./static
-COPY --chown=10001:0 --chmod=555 qubership-apihub-service/resources ./resources
-COPY --chown=10001:0 --chmod=555 docs/api ./api
+COPY --chown=10001:0 --chmod=555 --from=builder /workspace/qubership-apihub-backend/qubership-apihub-service/qubership-apihub-service ./qubership-apihub-service
+COPY --chown=10001:0 --chmod=555 qubership-apihub-backend/qubership-apihub-service/static ./static
+COPY --chown=10001:0 --chmod=555 qubership-apihub-backend/qubership-apihub-service/resources ./resources
+COPY --chown=10001:0 --chmod=555 qubership-apihub-backend/docs/api ./api
 
 USER 10001:10001
 
 CMD ["./qubership-apihub-service"]
-
