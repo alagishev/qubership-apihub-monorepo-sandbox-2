@@ -1,0 +1,27 @@
+name: Publish Helm chart
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Chart semver (no prefix)"
+        type: string
+        required: true
+      git-tag:
+        description: "Optional git tag to attach the packaged chart to"
+        type: string
+        required: false
+        default: ""
+
+permissions:
+  contents: write
+  packages: write
+
+jobs:
+  publish:
+    uses: netcracker/qubership-apihub-ci/.github/workflows/publish-helm-chart.yml@feat/monorepo-reusable-workflows
+    secrets: inherit
+    with:
+      version: ${{ inputs.version }}
+      chart-path: helm-templates/qubership-apihub
+      git-tag: ${{ inputs.git-tag }}
