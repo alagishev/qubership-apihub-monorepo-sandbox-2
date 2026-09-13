@@ -82,7 +82,7 @@ go build ./...
 go test ./... -v
 ```
 
-For module-specific build instructions, see the module's README file.
+For module-specific build instructions, see the module's readme file.
 
 ## CI/CD
 
@@ -123,7 +123,7 @@ The project follows standard Go conventions:
 - Run `go vet` before committing
 - Write tests for new functionality
 
-For module-specific development guidelines, refer to the module's README file.
+For module-specific development guidelines, refer to the module's readme file.
 
 ## License
 

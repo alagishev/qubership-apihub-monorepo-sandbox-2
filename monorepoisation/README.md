@@ -469,7 +469,7 @@ each module still carried `.github/linters`, `.github/instructions`, `super-lint
 `auto-labeler-config.yaml`, and (in one module) `release-drafter-config.yml`, plus duplicate
 `CONTRIBUTING.md`, `SECURITY.md`, and `CODE-OF-CONDUCT.md`. Those files do nothing in a monorepo,
 so they were deleted. APM sources (`agent-packages/`, `apm.yml`), compiled `AGENTS.md` /
-`.cursor` / `.claude`, licences, READMEs, and per-module `.editorconfig` stay.
+`.cursor` / `.claude`, licences, module readmes, and per-module `.editorconfig` stay.
 
 **Agent time (sandbox run):** about 15 minutes. Dominated by inventory and `git rm`.
 
@@ -497,11 +497,11 @@ root `.github`.
 - Root `.github/` (workflows, CODEOWNERS, Dependabot, linters, instructions).
 - Root `CONTRIBUTING.md`, `SECURITY.md`, `CODE-OF-CONDUCT.md`.
 - `<module>/agent-packages/`, `<module>/apm.yml`, compiled `AGENTS.md` / `.cursor` / `.claude`.
-- Licences, module READMEs, Dockerfiles, `.editorconfig`.
+- Licences, module readmes, Dockerfiles, `.editorconfig`.
 
 ## Do not
 
-- Delete `agent-packages/` or rewrite module READMEs in this step.
+- Delete `agent-packages/` or rewrite module readmes in this step.
 - Touch reusable workflows in `<CI_REPO>`.
 
 ## Verify
@@ -509,6 +509,66 @@ root `.github`.
 - `git ls-files '*/.github/**'` is empty.
 - `git ls-files '*/CONTRIBUTING.md' '*/SECURITY.md' '*/CODE-OF-CONDUCT.md'` is empty.
 - Root `.github/workflows`, `.github/linters`, and `.github/CODEOWNERS` are unchanged.
+````
+
+### 12. Adapt hoisted linters, link checker, and CLA to the monorepo tree
+
+**Summary:** After the polyrepos sit in one tree, super-linter Checkov treats every OpenAPI file as IaC
+(portal specs, Postman fixtures, `docs/api`). Lychee follows GitHub-pages root paths (`/docs/img/…`)
+and leftover polyrepo links (`CONTRIBUTING.md` inside a module, a missing backend overview). CLA
+Assistant writes to `Netcracker/cla-storage` and fails when `CLA_ACCESS_TOKEN` is unset (personal
+sandboxes). Skip OpenAPI Checkov paths, drop or retarget those links, skip CLA when the token is
+missing.
+
+**Agent time (sandbox run):** about 20 minutes. Dominated by CI log triage; local YAML and markdown
+edits were small.
+
+**Prompt:**
+
+````markdown
+After the modules land in one tree, the hoisted linters and CLA workflow still assume a single
+polyrepo layout. Adjust them so a docs-only change does not fail CI on OpenAPI fixtures, dead
+subtree links, or a missing org CLA token.
+
+## Inputs
+
+- GitHub org: `<GITHUB_ORG>`
+- Destination: this repo
+- Module repo names: `<MODULE_REPOS>`
+- CLA org / storage repo: `<CLA_ORG>` / `<CLA_STORAGE_REPO>` (default `Netcracker` / `cla-storage`)
+
+## Checkov
+
+In the destination `.github/linters/.checkov.yaml` (local file wins over the org copy):
+
+- Skip `CKV_OPENAPI_*` checks. API contracts are not Kubernetes/IaC.
+- Add `skip-path` entries for `<module>/docs/api`, UI-test spec fixtures, and Postman
+  `working-directory` sample APIs.
+
+## Link checker
+
+- Point module contributing links at the destination-root `CONTRIBUTING.md`.
+- Remove or retarget markdown links that the subtree never imported (missing overview pages).
+- Exclude GitHub-pages user guides that use root-relative `/docs/img/` paths, or add
+  `--exclude '/docs/img/'`, until those screenshots live in the monorepo.
+
+## CLA
+
+- Keep the CLA job for destinations in `<CLA_ORG>` that have `CLA_ACCESS_TOKEN`.
+- Skip the job when that secret is empty (`secrets.CLA_ACCESS_TOKEN != ''`). Personal forks and
+  sandboxes must not fail the PR because they cannot write `<CLA_ORG>/<CLA_STORAGE_REPO>`.
+
+## Do not
+
+- Rewrite OpenAPI files to satisfy Checkov.
+- Copy screenshot binaries into the monorepo in this step.
+- Change the CLA document URL or signature path for org destinations that already work.
+
+## Verify
+
+- A PR that only touches a module readme does not fail Checkov on `docs/api` or test fixtures.
+- `CLA Assistant` is skipped (or green) when `CLA_ACCESS_TOKEN` is unset.
+- Link checker does not report the retargeted contributing/overview links.
 ````
 
 ### Pins in this sandbox

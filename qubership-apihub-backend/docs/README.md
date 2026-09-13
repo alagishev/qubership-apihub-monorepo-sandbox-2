@@ -1,9 +1,5 @@
 # APIHub documentation
 
-## Architecture
-
-- [Backend overview](backend_overview.md)
-
 ## Development documentation
 
 - [Development guide](development_guide.md)
