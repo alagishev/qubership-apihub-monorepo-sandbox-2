@@ -132,6 +132,8 @@ jobs:
       labels: |
         maintainer=qubership
 
+  # WA: these Dockerfiles npm-pack @netcracker/<pkg>@$TAG. docker-ci passes the
+  # published image tag as TAG, and PR refs (pull-N-merge) are not on npm.
   docker-ui:
     needs: [detect, compute-tag]
     if: needs.detect.outputs.ui == 'true' || needs.detect.outputs.e2e_needed == 'true'
@@ -142,7 +144,7 @@ jobs:
       file: qubership-apihub-ui/Dockerfile
       context: qubership-apihub-ui
       platforms: linux/amd64,linux/arm64
-      image-tag: ${{ needs.compute-tag.outputs.tag }}
+      image-tag: dev
       image-repository: ghcr.io/${{ needs.compute-tag.outputs.registry_owner }}/qubership-apihub-ui
       labels: |
         maintainer=qubership
@@ -157,7 +159,7 @@ jobs:
       file: qubership-apihub-build-task-consumer/Dockerfile
       context: qubership-apihub-build-task-consumer
       platforms: linux/amd64,linux/arm64
-      image-tag: ${{ needs.compute-tag.outputs.tag }}
+      image-tag: dev
       image-repository: ghcr.io/${{ needs.compute-tag.outputs.registry_owner }}/qubership-apihub-build-task-consumer
       labels: |
         maintainer=qubership
