@@ -1,6 +1,6 @@
 ---
 description: Agents-backend environment variable conventions
-applyTo: qubership-apihub-agents-backend/service/system_info.go,qubership-apihub-agents-backend/**/*.go
+applyTo: qubership-apihub-agents-backend/qubership-apihub-agents-backend/service/system_info.go,qubership-apihub-agents-backend/qubership-apihub-agents-backend/**/*.go
 ---
 
 # Agents Backend Environment Variables

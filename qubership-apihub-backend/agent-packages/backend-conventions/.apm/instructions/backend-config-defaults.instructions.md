@@ -1,6 +1,6 @@
 ---
 description: Backend config defaults and validation conventions
-applyTo: qubership-apihub-service/**/*.go
+applyTo: qubership-apihub-backend/qubership-apihub-service/**/*.go
 ---
 
 # Backend Configuration Defaults

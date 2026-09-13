@@ -1,6 +1,6 @@
 ---
 description: Agents-backend development workflow for qubership-apihub-agents-backend.
-applyTo: "qubership-apihub-agents-backend/**/*.go"
+applyTo: "qubership-apihub-agents-backend/qubership-apihub-agents-backend/**/*.go"
 ---
 
 When implementing or modifying the APIHUB Agents Backend Go service (controllers, services,

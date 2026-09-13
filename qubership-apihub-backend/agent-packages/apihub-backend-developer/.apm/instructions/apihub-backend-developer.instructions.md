@@ -1,6 +1,6 @@
 ---
 description: Backend development workflow for qubership-apihub-backend.
-applyTo: "qubership-apihub-service/**/*.go"
+applyTo: "qubership-apihub-backend/qubership-apihub-service/**/*.go"
 ---
 
 When implementing or modifying the APIHub Go backend (controllers, services,

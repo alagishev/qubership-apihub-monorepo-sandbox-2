@@ -1,6 +1,6 @@
 ---
 description: Backend SQL migration path and validation script
-applyTo: "**/resources/migrations/**"
+applyTo: "qubership-apihub-backend/**/resources/migrations/**"
 ---
 
 # Backend Database Migrations

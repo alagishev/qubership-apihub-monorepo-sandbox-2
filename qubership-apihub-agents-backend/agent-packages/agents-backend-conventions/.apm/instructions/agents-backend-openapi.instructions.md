@@ -1,6 +1,6 @@
 ---
 description: Agents-backend OpenAPI file list and sync requirements
-applyTo: docs/api/**,qubership-apihub-agents-backend/controller/**
+applyTo: qubership-apihub-agents-backend/docs/api/**,qubership-apihub-agents-backend/qubership-apihub-agents-backend/controller/**
 ---
 
 # Agents Backend OpenAPI Files

@@ -8,6 +8,18 @@ dependencies:
     - Netcracker/qubership-ai-packages/agent-packages/english-developer-style
     - Netcracker/qubership-ai-packages/agent-packages/markdown-line-length-120
     - Netcracker/qubership-apihub-ci/agent-packages/development-conventions
+    - Netcracker/qubership-apihub-ci/agent-packages/github-ticket-implementation-planner
+    - Netcracker/qubership-apihub-ci/agent-packages/go-conventions
+    - Netcracker/qubership-apihub-ci/agent-packages/apihub-go-developer
+    - Netcracker/qubership-apihub-ci/agent-packages/apihub-go-self-review
     - ./agent-packages/apihub-deployment-authoring
-
-
+    - ./agent-packages/apihub-deployment-followup
+    - ./qubership-apihub-backend/agent-packages/apihub-backend-developer
+    - ./qubership-apihub-backend/agent-packages/apihub-backend-self-review
+    - ./qubership-apihub-backend/agent-packages/backend-conventions
+    - ./qubership-apihub-backend/agent-packages/advanced-verification
+    - ./qubership-apihub-agents-backend/agent-packages/apihub-agents-backend-developer
+    - ./qubership-apihub-agents-backend/agent-packages/agents-backend-conventions
+    - ./qubership-apihub-postman-collections/agent-packages/postman-e2e-authoring
+    - ./qubership-apihub-postman-collections/agent-packages/postman-e2e-followup
+    - ./qubership-apihub-ui/agent-packages/apihub-ui-authoring

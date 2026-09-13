@@ -1,6 +1,6 @@
 ---
 description: Agents-backend API spec discovery via commons-go api-spec-exposer
-applyTo: qubership-apihub-agents-backend/service.go,docs/api/**
+applyTo: qubership-apihub-agents-backend/qubership-apihub-agents-backend/service.go,qubership-apihub-agents-backend/docs/api/**
 ---
 
 # Agents Backend API Spec Exposer

@@ -1,6 +1,6 @@
 ---
 description: Agents-backend SQL migration path conventions
-applyTo: "**/resources/migrations/**"
+applyTo: "qubership-apihub-agents-backend/**/resources/migrations/**"
 ---
 
 # Agents Backend Database Migrations
