@@ -29,6 +29,9 @@ jobs:
             --exclude-path 'AGENTS.md'
             --exclude-path 'GEMINI.md'
             --exclude-path 'CLAUDE.md'
+            --exclude-path 'qubership-apihub-ui/docs/Portal User Guide.md'
+            --exclude-path 'qubership-apihub-ui/docs/Agent User Guide.md'
+            --exclude '/docs/img/'
             --verbose
             --no-progress
             --user-agent 'Mozilla/5.0 (X11; Linux x86_64) Chrome/134.0.0.0'
