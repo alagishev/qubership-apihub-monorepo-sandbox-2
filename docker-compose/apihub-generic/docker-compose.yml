@@ -1,8 +1,8 @@
 version: '3.9'
 services:
     qubership-apihub-backend:
-        image: ghcr.io/netcracker/qubership-apihub-backend:dev
-        #image: localhost/netcracker/qubership-apihub-backend:latest
+        image: ghcr.io/alagishev/qubership-apihub-backend:main
+        #image: localhost/alagishev/qubership-apihub-backend:latest
         container_name: qubership-apihub-backend
         ports:
         - "8090:8080"
@@ -38,7 +38,7 @@ services:
                 condition: service_healthy
 
     qubership-apihub-build-task-consumer:
-        image: ghcr.io/netcracker/qubership-apihub-build-task-consumer:dev
+        image: ghcr.io/alagishev/qubership-apihub-build-task-consumer:main
         container_name: qubership-apihub-build-task-consumer
         ports:
         - "3000:3000"
@@ -64,7 +64,7 @@ services:
                 condition: service_healthy
 
     qubership-apihub-ui:
-        image: ghcr.io/netcracker/qubership-apihub-ui:dev
+        image: ghcr.io/alagishev/qubership-apihub-ui:main
         container_name: qubership-apihub-ui
         ports:
         - "8081:8080"
@@ -90,7 +90,7 @@ services:
                 condition: service_healthy
 
     qubership-api-linter-service:
-        image: ghcr.io/netcracker/qubership-api-linter-service:dev
+        image: ghcr.io/alagishev/qubership-api-linter-service:main
         container_name: qubership-api-linter-service
         ports:
         - "8091:8080"
@@ -124,7 +124,7 @@ services:
                 condition: service_healthy
 
     qubership-apihub-agents-backend:
-        image: ghcr.io/netcracker/qubership-apihub-agents-backend:dev
+        image: ghcr.io/alagishev/qubership-apihub-agents-backend:main
         container_name: qubership-apihub-agents-backend
         ports:
         - "8092:8080"

@@ -1,0 +1,735 @@
+name: run E2E tests in Kind
+
+on:
+  workflow_call:
+    inputs:
+      helm-repository-url:
+        description: "URL of the repository containing Helm templates"
+        type: string
+        default: "https://github.com/alagishev/qubership-apihub-monorepo-sandbox-2"
+      helm-repository-branch:
+        description: "Branch containing Helm templates"
+        type: string
+        default: "main"
+      postman-collections-run:
+        description: "Flag for executing postman collections"
+        type: boolean
+        default: true
+      postman-repository-url:
+        description: "URL of the repository to clone"
+        type: string
+        default: "https://github.com/alagishev/qubership-apihub-monorepo-sandbox-2"
+      postman-repository-branch:
+        description: "Branch to clone"
+        type: string
+      postman-collections-list:
+        description: "Collections to execute"
+        type: string
+        default: "./e2e/1_1_Smoke_Portal.postman_collection.json"
+      newman-timeout-request:
+        description: "Newman timeout for a single request, in milliseconds"
+        type: number
+        default: 120000
+      newman-timeout-collection:
+        description: "Newman timeout for a whole collection run, in milliseconds"
+        type: number
+        default: 1800000
+      playwright-tests-run:
+        description: "Flag for executing playwright tests"
+        type: boolean
+        default: true
+      playwright-repository-url:
+        description: "URL of the repository to clone"
+        type: string
+        default: "https://github.com/alagishev/qubership-apihub-monorepo-sandbox-2"
+      playwright-repository-branch:
+        description: "Branch to clone"
+        type: string
+      playwright-test-args:
+        description: "Playwright test command CLI arguments"
+        type: string
+        default: "--project=Portal --workers=8 --grep-invert=@flaky"
+      apihub-backend-image-tag:
+        description: "BE image tag to be executed"
+        type: string
+        default: "main"
+      apihub-build-task-consumer-image-tag:
+        description: "Build Task Consumer image tag to be executed"
+        type: string
+        default: "main"
+      apihub-ui-image-tag:
+        description: "UI image tag to be executed"
+        type: string
+        default: "main"
+      apihub-api-linter-service-image-tag:
+        description: "API Linter Service image tag to be executed"
+        type: string
+        default: "main"
+      apihub-agents-backend-image-tag:
+        description: "Agents Backend image tag to be executed"
+        type: string
+        default: "main"
+      apihub-agent-run:
+        description: "Flag for deploying Qubership APIHUB Agent"
+        type: boolean
+        default: false
+      apihub-agent-helm-repository-branch:
+        description: "Qubership APIHUB Agent branch containing Helm templates"
+        type: string
+        default: "develop"
+      apihub-agent-image-tag:
+        description: "Qubership APIHUB Agent image tag to be executed"
+        type: string
+        default: "dev"
+      source-layout:
+        description: "polyrepo clones sibling repositories; monorepo checkouts the caller once"
+        type: string
+        default: "monorepo"
+      postman-path:
+        type: string
+        default: "qubership-apihub-postman-collections"
+      playwright-path:
+        type: string
+        default: "qubership-apihub-ui-tests"
+      image-refs-json:
+        type: string
+        default: ""
+      job-timeout-minutes:
+        description: "Timeout for the whole E2E job, in minutes"
+        type: number
+        default: 120
+    secrets:
+      JWT_PRIVATE_KEY:
+        required: true
+      APIHUB_ADMIN_EMAIL:
+        required: true
+      APIHUB_ADMIN_PASSWORD:
+        required: true
+      APIHUB_ACCESS_TOKEN:
+        required: true
+
+jobs:
+  run_kind_and_run_tests:
+    runs-on: ubuntu-latest
+    timeout-minutes: ${{ inputs.job-timeout-minutes }}
+    steps:
+      - name: Checkout caller (monorepo)
+        if: ${{ inputs.source-layout == 'monorepo' }}
+        uses: actions/checkout@v6
+        with:
+          path: src
+      - name: Link monorepo trees
+        if: ${{ inputs.source-layout == 'monorepo' }}
+        run: |
+          ln -s "$GITHUB_WORKSPACE/src" helm-repo
+          ln -s "$GITHUB_WORKSPACE/src/${{ inputs.postman-path }}" postman-repo
+          ln -s "$GITHUB_WORKSPACE/src/${{ inputs.playwright-path }}" playwright-repo
+      - name: Clone deployment repository
+        if: ${{ inputs.source-layout != 'monorepo' }}
+        run: |
+          git clone --branch ${{ inputs.helm-repository-branch }} --single-branch \
+            ${{ inputs.helm-repository-url }} helm-repo
+
+      - name: Clone Qubership APIHUB Agent Helm repository
+        if: ${{ inputs.apihub-agent-run }}
+        env:
+          APIHUB_AGENT_HELM_BRANCH: ${{ inputs.apihub-agent-helm-repository-branch }}
+        run: |
+          git clone --branch "$APIHUB_AGENT_HELM_BRANCH" --single-branch \
+            https://github.com/Netcracker/qubership-apihub-agent apihub-agent-repo
+
+      - name: Clone Qubership APIHUB test service repository
+        if: ${{ inputs.apihub-agent-run }}
+        run: |
+          git clone --branch main --single-branch --depth 1 \
+            https://github.com/Netcracker/qubership-apihub-test-service test-service-repo
+
+      - name: Install envsubst
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y gettext-base
+
+      - name: Install Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: "24"
+          registry-url: "https://npm.pkg.github.com/"
+
+      - name: Create Kind configuration
+        run: |
+          cat > kind-config.yaml <<'EOF'
+          kind: Cluster
+          apiVersion: kind.x-k8s.io/v1alpha4
+          nodes:
+            - role: control-plane
+              extraPortMappings:
+                - containerPort: 80
+                  hostPort: 80
+                  protocol: TCP
+                - containerPort: 443
+                  hostPort: 443
+                  protocol: TCP
+          EOF
+
+      - name: Create Kind cluster
+        uses: helm/kind-action@v1
+        with:
+          cluster_name: apihub-e2e
+          config: kind-config.yaml
+          wait: 120s
+
+      - name: Install ingress controller
+        run: |
+          kubectl apply -f \
+            https://raw.githubusercontent.com/kubernetes/ingress-nginx/main/deploy/static/provider/kind/deploy.yaml
+          kubectl wait --namespace ingress-nginx \
+            --for=condition=Ready pod \
+            --selector=app.kubernetes.io/component=controller \
+            --timeout=180s
+
+      - name: Login to GHCR
+        run: |
+          echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u "${{ github.actor }}" --password-stdin
+
+      - name: Pull images and load into Kind
+        env:
+          IMAGE_REFS_JSON: ${{ inputs.image-refs-json }}
+          GITHUB_REPOSITORY_OWNER: ${{ github.repository_owner }}
+        run: |
+          python3 - <<'PY'
+          import json, os, subprocess
+          refs = json.loads(os.environ.get("IMAGE_REFS_JSON") or "{}")
+          if not refs:
+              owner = os.environ["GITHUB_REPOSITORY_OWNER"]
+              tag = "main"
+              names = (
+                  "qubership-apihub-backend",
+                  "qubership-apihub-ui",
+                  "qubership-apihub-build-task-consumer",
+                  "qubership-api-linter-service",
+                  "qubership-apihub-agents-backend",
+              )
+              refs = {name: f"ghcr.io/{owner}/{name}:{tag}" for name in names}
+          for ref in refs.values():
+              if not ref:
+                  continue
+              subprocess.check_call(["docker", "pull", ref])
+              subprocess.check_call(["kind", "load", "docker-image", ref, "--name", "apihub-e2e"])
+          PY
+
+      - name: Template .env and config.yaml files with environment variables
+        env:
+          JWT_PRIVATE_KEY: ${{ secrets.JWT_PRIVATE_KEY }}
+          APIHUB_ADMIN_EMAIL: ${{ secrets.APIHUB_ADMIN_EMAIL }}
+          APIHUB_ADMIN_PASSWORD: ${{ secrets.APIHUB_ADMIN_PASSWORD }}
+          APIHUB_ACCESS_TOKEN: ${{ secrets.APIHUB_ACCESS_TOKEN }}
+        run: |
+          cd helm-repo
+          find . -name "*.env" -print0 | while IFS= read -r -d '' env_file; do
+            envsubst < "$env_file" > "${env_file}.tmp"
+            mv "${env_file}.tmp" "$env_file"
+          done
+
+          cd helm-templates/local-k8s-quickstart
+          find . -name "*config.yaml" -print0 | while IFS= read -r -d '' config_file; do
+            envsubst < "$config_file" > "${config_file}.tmp"
+            mv "${config_file}.tmp" "$config_file"
+          done
+
+          chmod +x scripts/generate-local-tls.sh scripts/create-custom-ca-secrets.sh
+          ./scripts/generate-local-tls.sh
+          APIHUB_TLS_CRT=$(base64 -w 0 < qubership-apihub/certs/tls.crt)
+          APIHUB_TLS_KEY=$(base64 -w 0 < qubership-apihub/certs/tls.key)
+          export APIHUB_TLS_CRT APIHUB_TLS_KEY
+
+          envsubst < qubership-apihub/local-secrets.yaml.template \
+            > qubership-apihub/local-secrets.yaml
+
+      - name: Deploy PostgreSQL
+        working-directory: helm-repo/helm-templates/local-k8s-quickstart
+        run: |
+          helm upgrade --install postgres-db ./postgres-db \
+            --namespace postgres-db \
+            --create-namespace \
+            --wait \
+            --timeout 5m
+
+      - name: Create local custom CA Secret
+        working-directory: helm-repo/helm-templates/local-k8s-quickstart/scripts
+        run: ./create-custom-ca-secrets.sh
+
+      - name: Deploy APIHUB
+        working-directory: helm-repo/helm-templates/local-k8s-quickstart
+        env:
+          IMAGE_REFS_JSON: ${{ inputs.image-refs-json }}
+        run: |
+          cat > "$RUNNER_TEMP/apihub-ui-tests-values.yaml" <<'EOF'
+          qubershipApihubBackend:
+            env:
+              businessParameters:
+                defaultWorkspaceId: 'QS'
+              extensions:
+                - name: api-linter
+                  baseUrl: http://qubership-api-linter-service:8080
+                  pathPrefix: api-linter
+                - name: agents-backend
+                  baseUrl: http://qubership-apihub-agents-backend:8080
+                  pathPrefix: agents-backend
+                - name: nc-service
+                  baseUrl: http://qubership-apihub-backend:8080
+                  pathPrefix: apihub-nc
+          qubershipApihubAgentsBackend:
+            env:
+              businessParameters:
+                defaultWorkspaceId: 'QS'
+              technicalParameters:
+                apihub:
+                  url: 'https://qubership-apihub.localtest.me'
+          EOF
+          EXTRA_VALUES=()
+          EXTRA_SETS=()
+          if [ -n "$IMAGE_REFS_JSON" ]; then
+            python3 - <<'PY'
+          import json, os, pathlib
+          refs = json.loads(os.environ["IMAGE_REFS_JSON"])
+          mapping = {
+              "backend": "qubershipApihubBackend",
+              "ui": "qubershipApihubUi",
+              "build_task_consumer": "qubershipApihubBuildTaskConsumer",
+              "api_linter_service": "qubershipApiLinterService",
+              "agents_backend": "qubershipApihubAgentsBackend",
+          }
+          lines = []
+          for key, helm in mapping.items():
+              ref = refs.get(key) or ""
+              if ":" not in ref:
+                  continue
+              repo, tag = ref.rsplit(":", 1)
+              lines.extend([f"{helm}:", "  image:", f"    repository: {repo}", f"    tag: '{tag}'", ""])
+          path = pathlib.Path(os.environ["RUNNER_TEMP"]) / "image-refs-values.yaml"
+          path.write_text("\n".join(lines), encoding="utf-8")
+          print(path.read_text(encoding="utf-8"))
+          PY
+            EXTRA_VALUES+=(--values "$RUNNER_TEMP/image-refs-values.yaml")
+          else
+            EXTRA_SETS+=(
+              --set-string qubershipApihubBackend.image.tag=${{ inputs.apihub-backend-image-tag }}
+              --set-string qubershipApihubBuildTaskConsumer.image.tag=${{ inputs.apihub-build-task-consumer-image-tag }}
+              --set-string qubershipApihubUi.image.tag=${{ inputs.apihub-ui-image-tag }}
+              --set-string qubershipApiLinterService.image.tag=${{ inputs.apihub-api-linter-service-image-tag }}
+              --set-string qubershipApihubAgentsBackend.image.tag=${{ inputs.apihub-agents-backend-image-tag }}
+            )
+          fi
+          helm upgrade --install apihub ../qubership-apihub \
+            --namespace qubership-apihub \
+            --create-namespace \
+            --values qubership-apihub/local-k8s-values.yaml \
+            --values qubership-apihub/local-secrets.yaml \
+            --values "$RUNNER_TEMP/apihub-ui-tests-values.yaml" \
+            "${EXTRA_VALUES[@]}" \
+            "${EXTRA_SETS[@]}" \
+            --wait \
+            --timeout 10m
+
+      - name: Deploy test services
+        if: ${{ inputs.apihub-agent-run }}
+        working-directory: test-service-repo
+        run: |
+          # The test-service chart hardcodes metadata.name and
+          # app.kubernetes.io/part-of, so the same chart is instantiated
+          # six times via helm template + sed + awk. That pipeline is
+          # coupled to the chart's literal YAML (resource names, unquoted
+          # part-of values, the app.kubernetes.io/part-of key, and
+          # --show-only template paths). Drop it when the chart accepts
+          # name / part-of / version as values.
+          #
+          # Failures split across two checks below:
+          # - rollout status: missing or unready Deployment (rename)
+          # - assert_test_service: silent label miss (Agent groups by
+          #   part-of + version; Playwright expects APIHUB / API-HUB /
+          #   APIHUB-AGENT)
+          chart=./helm-template/qubership-apihub-test-service
+          apply_test_service() {
+            namespace=$1
+            name=$2
+            image_tag=$3
+            part_of=$4
+            helm template "$name" "$chart" \
+              --namespace "$namespace" \
+              --set-string "qubershipApihubTestService.image.tag=${image_tag}" \
+              --show-only templates/Deployment.yaml \
+              --show-only templates/Service.yaml \
+            | sed \
+              -e "s/name: qubership-apihub-test-service/name: ${name}/g" \
+              -e "s/part-of: qubership-apihub-test-service/part-of: ${part_of}/g" \
+            | awk -v ver="$image_tag" '
+                /app\.kubernetes\.io\/part-of:/ {
+                  print
+                  match($0, /^[[:space:]]*/)
+                  print substr($0, 1, RLENGTH) "app.kubernetes.io/version: \"" ver "\""
+                  next
+                }
+                { print }
+              ' \
+            | kubectl apply --namespace "$namespace" -f -
+          }
+          assert_test_service() {
+            namespace=$1
+            name=$2
+            part_of=$3
+            version=$4
+            if ! deploy_got=$(kubectl get deployment "$name" \
+              --namespace "$namespace" \
+              --output=jsonpath='{.metadata.labels.app\.kubernetes\.io/part-of}{"|"}{.spec.template.metadata.labels.app\.kubernetes\.io/part-of}{"|"}{.spec.template.metadata.labels.app\.kubernetes\.io/version}'); then
+              echo "::error::deployment/${name} is missing in namespace ${namespace}."
+              exit 1
+            fi
+            deploy_want="${part_of}|${part_of}|${version}"
+            if [ "$deploy_got" != "$deploy_want" ]; then
+              echo "::error::deployment/${name} in ${namespace}: expected ${deploy_want}, got ${deploy_got}."
+              exit 1
+            fi
+            if ! service_got=$(kubectl get service "$name" \
+              --namespace "$namespace" \
+              --output=jsonpath='{.metadata.labels.app\.kubernetes\.io/part-of}'); then
+              echo "::error::service/${name} is missing in namespace ${namespace}."
+              exit 1
+            fi
+            if [ "$service_got" != "$part_of" ]; then
+              echo "::error::service/${name} in ${namespace}: expected part-of=${part_of}, got ${service_got}."
+              exit 1
+            fi
+          }
+
+          for namespace in api-hub-ci api-hub-preprod; do
+            kubectl create namespace "$namespace" --dry-run=client -o yaml | kubectl apply -f -
+            apply_test_service "$namespace" apihub-agent-test-service protected-atui APIHUB
+            apply_test_service "$namespace" apihub-backend protected-atui "API-HUB"
+            apply_test_service "$namespace" apihub-agent protected-atui-empty APIHUB-AGENT
+          done
+
+          for namespace in api-hub-ci api-hub-preprod; do
+            for name in apihub-agent-test-service apihub-backend apihub-agent; do
+              kubectl rollout status "deployment/${name}" \
+                --namespace "$namespace" \
+                --timeout=5m
+            done
+            assert_test_service "$namespace" apihub-agent-test-service APIHUB protected-atui
+            assert_test_service "$namespace" apihub-backend "API-HUB" protected-atui
+            assert_test_service "$namespace" apihub-agent APIHUB-AGENT protected-atui-empty
+          done
+
+      - name: Deploy Qubership APIHUB Agent
+        if: ${{ inputs.apihub-agent-run }}
+        working-directory: apihub-agent-repo
+        env:
+          APIHUB_ACCESS_TOKEN: ${{ secrets.APIHUB_ACCESS_TOKEN }}
+          APIHUB_AGENT_IMAGE_TAG: ${{ inputs.apihub-agent-image-tag }}
+        run: |
+          printf '%s' "$APIHUB_ACCESS_TOKEN" > "$RUNNER_TEMP/apihub-agent-access-token"
+          cat > "$RUNNER_TEMP/apihub-agent-ui-tests-values.yaml" <<'EOF'
+          qubershipApihubAgent:
+            customCa:
+              enabled: true
+              secretName: apihub-local-custom-ca
+            env:
+              discovery:
+                groupingLabels:
+                  - app.kubernetes.io/part-of
+                  - app.kubernetes.io/version
+              technicalParameters:
+                apihub:
+                  url: 'https://qubership-apihub.localtest.me'
+          EOF
+          helm upgrade --install qubership-apihub-agent ./helm-templates/qubership-apihub-agent \
+            --namespace qubership-apihub \
+            --values ./helm-templates/qubership-apihub-agent/local-k8s-values.yaml \
+            --values "$RUNNER_TEMP/apihub-agent-ui-tests-values.yaml" \
+            --set-string qubershipApihubAgent.version="$APIHUB_AGENT_IMAGE_TAG" \
+            --set-string qubershipApihubAgent.image.tag="$APIHUB_AGENT_IMAGE_TAG" \
+            --set-string \
+            qubershipApihubAgent.env.technicalParameters.agentHost=qubership-apihub-agent.qubership-apihub.svc.cluster.local \
+            --set-file \
+            qubershipApihubAgent.env.technicalParameters.apihub.accessToken="$RUNNER_TEMP/apihub-agent-access-token"
+
+      - name: Patch APIHUB hosts
+        working-directory: helm-repo/helm-templates/local-k8s-quickstart/scripts
+        run: sh ./6-patch-apihub-hosts.sh
+
+      - name: Wait for APIHUB rollout
+        run: |
+          for deployment in $(kubectl get deployments \
+            --namespace qubership-apihub \
+            --output=name); do
+            kubectl rollout status "$deployment" \
+              --namespace qubership-apihub \
+              --timeout=5m
+          done
+
+      - name: Forward APIHUB port
+        run: |
+          kubectl port-forward \
+            --namespace qubership-apihub \
+            service/qubership-apihub-ui 8081:8080 \
+            > ./port-forward.log 2>&1 &
+
+      - name: Wait for APIHUB startup
+        env:
+          APIHUB_ACCESS_TOKEN: ${{ secrets.APIHUB_ACCESS_TOKEN }}
+        run: |
+          echo "Waiting for APIHUB and end-to-end API key authentication..."
+          end_time=$((SECONDS + 300))
+          while [ $SECONDS -lt $end_time ]; do
+            login_status=$(curl -s -o /dev/null -w "%{http_code}" \
+              http://localhost:8081/login || true)
+            api_key_status=$(curl -s -o /dev/null -w "%{http_code}" \
+              --header "api-key: $APIHUB_ACCESS_TOKEN" \
+              http://localhost:8081/api/v2/auth/apiKey || true)
+            agents_backend_status=$(curl -s -o /dev/null -w "%{http_code}" \
+              --header "api-key: $APIHUB_ACCESS_TOKEN" \
+              http://localhost:8081/agents-backend/api/v2/agents || true)
+            if [ "$login_status" = "200" ] \
+              && [ "$api_key_status" = "200" ] \
+              && [ "$agents_backend_status" = "200" ]; then
+              echo "APIHUB and Agents Backend accept the API key."
+              exit 0
+            fi
+            echo "Login: $login_status; API key: $api_key_status; Agents Backend: $agents_backend_status."
+            echo "Retrying in 5 seconds..."
+            sleep 5
+          done
+          echo "Timeout reached. APIHUB was not ready within 5 minutes."
+          exit 1
+
+      - name: Verify Qubership APIHUB Agent configuration
+        if: ${{ inputs.apihub-agent-run }}
+        env:
+          APIHUB_ACCESS_TOKEN: ${{ secrets.APIHUB_ACCESS_TOKEN }}
+        run: |
+          agent_config=$(kubectl get secret qubership-apihub-agent-config-secret \
+            --namespace qubership-apihub \
+            --output=jsonpath='{.data.config\.yaml}' \
+            | base64 --decode)
+          require_in_agent_config() {
+            needle=$1
+            message=$2
+            if ! printf '%s' "$agent_config" | grep --fixed-strings --quiet -- "$needle"; then
+              echo "::error::$message"
+              exit 1
+            fi
+          }
+          require_in_agent_config "$APIHUB_ACCESS_TOKEN" \
+            "Agent configuration does not contain the expected APIHUB access token."
+          require_in_agent_config 'https://qubership-apihub.localtest.me' \
+            "Agent configuration does not use the public APIHUB URL."
+          require_in_agent_config 'app.kubernetes.io/part-of' \
+            "Agent configuration does not enable part-of grouping labels."
+          require_in_agent_config 'app.kubernetes.io/version' \
+            "Agent configuration does not enable version grouping labels."
+          echo "Agent configuration contains the access token, public APIHUB URL, and grouping labels."
+
+      - name: Install Newman
+        if: ${{ inputs.postman-collections-run }}
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          npm install -g newman newman-reporter-htmlextra
+
+      - name: Calculate Newman tests branch
+        id: calculate-postman-branch
+        if: ${{ inputs.postman-collections-run && inputs.source-layout != 'monorepo' }}
+        run: |
+          BRANCH="${{ inputs.postman-repository-branch }}"
+          if [ -n "$BRANCH" ]; then
+            if git ls-remote --heads ${{ inputs.postman-repository-url }} refs/heads/$BRANCH | grep -q $BRANCH; then
+              echo "Branch $BRANCH exists in postman tests repository"
+            else
+              echo "Branch $BRANCH does not exist in postman tests repository, using develop instead"
+              BRANCH="develop"
+            fi
+          else
+            BRANCH="develop"
+            echo "No branch specified, using develop as default"
+          fi
+          echo "Using postman tests repository branch: $BRANCH"
+          echo "branch=$BRANCH" >> "$GITHUB_OUTPUT"
+
+      - name: Clone apihub-postman-collections repository
+        if: ${{ inputs.postman-collections-run && inputs.source-layout != 'monorepo' }}
+        run: |
+          git clone --branch ${{ steps.calculate-postman-branch.outputs.branch }} --single-branch \
+            ${{ inputs.postman-repository-url }} postman-repo
+
+      - name: Prepare env file for Newman
+        if: ${{ inputs.postman-collections-run }}
+        working-directory: postman-repo
+        env:
+          JWT_PRIVATE_KEY: ${{ secrets.JWT_PRIVATE_KEY }}
+          APIHUB_ADMIN_EMAIL: ${{ secrets.APIHUB_ADMIN_EMAIL }}
+          APIHUB_ADMIN_PASSWORD: ${{ secrets.APIHUB_ADMIN_PASSWORD }}
+          APIHUB_ACCESS_TOKEN: ${{ secrets.APIHUB_ACCESS_TOKEN }}
+        run: |
+          envsubst < ./environment/local.postman_environment.json > ./ci.postman_environment.json
+
+      - name: Run Postman Collections with Newman
+        if: ${{ inputs.postman-collections-run }}
+        working-directory: postman-repo
+        run: |
+          IFS=',' read -ra COLLECTIONS <<< "${{ inputs.postman-collections-list }}"
+          for collection in "${COLLECTIONS[@]}"; do
+            sanitized_collection_name=$(echo "$collection" | tr -d './')
+            echo "Running collection: $collection"
+            newman run "$collection" -e ./ci.postman_environment.json -x \
+              --timeout ${{ inputs.newman-timeout-collection }} \
+              --timeout-request ${{ inputs.newman-timeout-request }} \
+              --reporters cli,htmlextra \
+              --reporter-htmlextra-export "./reports/${sanitized_collection_name}_results.html"
+          done
+
+      - name: Upload Newman reports as artifacts
+        if: ${{ inputs.postman-collections-run }}
+        uses: actions/upload-artifact@v7
+        with:
+          name: newman-reports
+          path: ${{ github.workspace }}/postman-repo/reports/*.html
+          retention-days: 7
+
+      - name: Run Newman tests results check
+        id: check_newman_tests
+        if: ${{ inputs.postman-collections-run }}
+        continue-on-error: true
+        run: |
+          TOTAL_FAILED=0
+          for file in ${{ github.workspace }}/postman-repo/reports/*.html; do
+            FAILED_TESTS=$(grep -A1 '<h6 class="text-uppercase">Total Failed Tests</h6>' "$file" \
+              | grep -oP '(?<=<h1 class="display-1">)[0-9]+(?=</h1>)')
+            TOTAL_FAILED=$((TOTAL_FAILED + FAILED_TESTS))
+          done
+          if [ "$TOTAL_FAILED" -ne 0 ]; then
+            exit 1
+          fi
+
+      - name: Calculate Playwright tests branch
+        id: calculate-playwright-branch
+        if: ${{ inputs.playwright-tests-run && inputs.source-layout != 'monorepo' }}
+        run: |
+          BRANCH="${{ inputs.playwright-repository-branch }}"
+          if [ -n "$BRANCH" ]; then
+            if git ls-remote --heads ${{ inputs.playwright-repository-url }} refs/heads/$BRANCH | grep -q $BRANCH; then
+              echo "Branch $BRANCH exists in playwright tests repository"
+            else
+              echo "Branch $BRANCH does not exist in playwright tests repository, using develop instead"
+              BRANCH="develop"
+            fi
+          else
+            BRANCH="develop"
+            echo "No branch specified, using develop as default"
+          fi
+          echo "Using playwright tests repository branch: $BRANCH"
+          echo "branch=$BRANCH" >> "$GITHUB_OUTPUT"
+
+      - name: Clone Playwright tests repository
+        if: ${{ inputs.playwright-tests-run && inputs.source-layout != 'monorepo' }}
+        run: |
+          git clone --branch ${{ steps.calculate-playwright-branch.outputs.branch }} --single-branch \
+            ${{ inputs.playwright-repository-url }} playwright-repo
+
+      - name: Install Playwright
+        if: ${{ inputs.playwright-tests-run }}
+        working-directory: playwright-repo
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          npm ci
+          npx playwright install --with-deps chromium
+
+      - name: Run Playwright tests
+        id: run_playwright_tests
+        if: ${{ inputs.playwright-tests-run }}
+        continue-on-error: true
+        working-directory: playwright-repo
+        env:
+          BASE_URL: "https://qubership-apihub.localtest.me"
+          TEST_USER_PASSWORD: ${{ secrets.APIHUB_ADMIN_PASSWORD }}
+          AGENT_TEST_CLOUD: "kind_qubership-apihub"
+          CLEAR_TD: "skip"
+        run: |
+          npx playwright test ${{ inputs.playwright-test-args }}
+
+      - name: Upload Playwright reports as artifacts
+        if: ${{ inputs.playwright-tests-run }}
+        uses: actions/upload-artifact@v7
+        with:
+          name: playwright-reports
+          path: ${{ github.workspace }}/playwright-repo/reports
+          retention-days: 7
+
+      - name: Collect Kubernetes logs
+        if: ${{ always() }}
+        run: |
+          kubectl get all --all-namespaces > ./kubernetes-resources.log 2>&1 || true
+          kubectl get events --all-namespaces \
+            --sort-by='.metadata.creationTimestamp' > ./kubernetes-events.log 2>&1 || true
+          for namespace in postgres-db qubership-apihub ingress-nginx api-hub-ci api-hub-preprod; do
+            kubectl get pods --namespace "$namespace" -o name 2>/dev/null | while read -r pod; do
+              log_name=$(echo "${namespace}-${pod#pod/}" | tr '/' '-')
+              kubectl logs --namespace "$namespace" "$pod" \
+                --all-containers --prefix > "./${log_name}.log" 2>&1 || true
+              kubectl describe --namespace "$namespace" "$pod" \
+                > "./${log_name}-describe.log" 2>&1 || true
+            done
+          done
+
+      - name: Upload Kubernetes logs as artifacts
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v7
+        with:
+          name: kubernetes-logs
+          path: ${{ github.workspace }}/*.log
+          retention-days: 7
+
+      - name: Show test run config
+        if: ${{ always() }}
+        run: |
+          {
+            echo "## Test run configuration"
+            echo "| Parameter | Value |"
+            echo "|---|---|"
+            echo "| Runtime | \`Kind / Kubernetes\` |"
+            echo "| **Execute BE tests** | **\`${{ inputs.postman-collections-run }}\`** |"
+            echo "| Postman branch | \`${{ steps.calculate-postman-branch.outputs.branch || 'branch was not calculated' }}\` |"
+            echo -n "| Postman collections | "
+            IFS=',' read -ra COLLECTIONS <<< "${{ inputs.postman-collections-list }}"
+            for i in "${!COLLECTIONS[@]}"; do
+              if [ "$i" -gt 0 ]; then
+                echo -n "<br>"
+              fi
+              echo -n "\`${COLLECTIONS[$i]}\`"
+            done
+            echo " |"
+            echo "| **Execute UI tests** | **\`${{ inputs.playwright-tests-run }}\`** |"
+            echo "| Playwright branch | \`${{ steps.calculate-playwright-branch.outputs.branch || 'branch was not calculated' }}\` |"
+            echo "| Playwright arguments | \`${{ inputs.playwright-test-args }}\` |"
+            echo "| Backend image tag | \`${{ inputs.apihub-backend-image-tag }}\` |"
+            echo "| Build Task Consumer image tag | \`${{ inputs.apihub-build-task-consumer-image-tag }}\` |"
+            echo "| UI image tag | \`${{ inputs.apihub-ui-image-tag }}\` |"
+            echo "| API Linter Service image tag | \`${{ inputs.apihub-api-linter-service-image-tag }}\` |"
+            echo "| Agents Backend image tag | \`${{ inputs.apihub-agents-backend-image-tag }}\` |"
+            echo "| **Deploy APIHUB Agent** | **\`${{ inputs.apihub-agent-run }}\`** |"
+            echo "| APIHUB Agent Helm branch | \`${{ inputs.apihub-agent-helm-repository-branch }}\` |"
+            echo "| APIHUB Agent image tag | \`${{ inputs.apihub-agent-image-tag }}\` |"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Fail job if there are failed tests
+        if: ${{ always() }}
+        run: |
+          if [ "${{ steps.check_newman_tests.outcome }}" == "failure" ]; then
+            echo "Newman tests failed"
+          fi
+          if [ "${{ steps.run_playwright_tests.outcome }}" == "failure" ]; then
+            echo "Playwright tests failed"
+          fi
+          if [ "${{ steps.check_newman_tests.outcome }}" == "failure" ] \
+            || [ "${{ steps.run_playwright_tests.outcome }}" == "failure" ]; then
+            exit 1
+          fi

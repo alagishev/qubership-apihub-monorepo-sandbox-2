@@ -1,9 +1,9 @@
 # Section with APIHUB Backend configuration
 qubershipApihubBackend:
   image:
-    repository: 'ghcr.io/netcracker/qubership-apihub-backend'
+    repository: 'ghcr.io/alagishev/qubership-apihub-backend'
     # Pin tags from the latest product release: https://github.com/Netcracker/qubership-apihub/releases/latest
-    tag: 'latest'
+    tag: 'main'
   replicas: 1
 
   # Section with resource limits
@@ -316,9 +316,9 @@ qubershipApihubBackend:
 # Section with APIHUB Build Task Consumer configuration
 qubershipApihubBuildTaskConsumer:
   image:
-    repository: 'ghcr.io/netcracker/qubership-apihub-build-task-consumer'
+    repository: 'ghcr.io/alagishev/qubership-apihub-build-task-consumer'
     # Pin tags from the latest product release: https://github.com/Netcracker/qubership-apihub/releases/latest
-    tag: 'dev'
+    tag: 'main'
   replicas: 1
 
   # Section with resource limits
@@ -344,9 +344,9 @@ qubershipApihubBuildTaskConsumer:
 # Section with APIHUB UI configuration
 qubershipApihubUi:
   image:
-    repository: 'ghcr.io/netcracker/qubership-apihub-ui'
+    repository: 'ghcr.io/alagishev/qubership-apihub-ui'
     # Pin tags from the latest product release: https://github.com/Netcracker/qubership-apihub/releases/latest
-    tag: 'dev'
+    tag: 'main'
   replicas: 1
 
   # Section with resource limits
@@ -385,9 +385,9 @@ qubershipApihubUi:
 # Section with APIHUB API Linter service configuration
 qubershipApiLinterService:
   image:
-    repository: 'ghcr.io/netcracker/qubership-api-linter-service'
+    repository: 'ghcr.io/alagishev/qubership-api-linter-service'
     # Pin tags from the latest product release: https://github.com/Netcracker/qubership-apihub/releases/latest
-    tag: 'dev'
+    tag: 'main'
   replicas: 1
 
   # Optional; custom CA certificates for linter HTTPS outbound calls (APIHUB API, OpenAI).
@@ -491,9 +491,9 @@ qubershipApihubAgentsBackend:
   # Optional; Qubership APIHUB Agents Backend release version; If not set, default value: unknown; Example: 1.0.0
   version: ''
   image:
-    repository: 'ghcr.io/netcracker/qubership-apihub-agents-backend'
+    repository: 'ghcr.io/alagishev/qubership-apihub-agents-backend'
     # Pin tags from the latest product release: https://github.com/Netcracker/qubership-apihub/releases/latest
-    tag: 'dev'
+    tag: 'main'
 
   customCa:
     # Optional; mount custom CA Secret when true; If not set, default value: false; Example: true

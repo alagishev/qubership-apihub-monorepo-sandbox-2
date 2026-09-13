@@ -24,6 +24,8 @@ detect_paths:
   helm-compose:
     - helm-templates/**
     - docker-compose/**
+    - ci/**
+    - .github/workflows/**
 
 image_modules:
   - id: backend
@@ -68,8 +70,8 @@ e2e:
   helm_chart: helm-templates/qubership-apihub
   postman_path: qubership-apihub-postman-collections
   playwright_path: qubership-apihub-ui-tests
-  fallback_registry: ghcr.io/netcracker
-  fallback_tag: dev
+  fallback_registry: ghcr.io/alagishev
+  fallback_tag: main
   postman_collections: >-
     ./e2e/1_1_Smoke_Portal.postman_collection.json,./e2e/1_3_Linter_Portal.postman_collection.json,./e2e/2_1_Negative_Portal.postman_collection.json,./e2e/3_1_Stories_Bugs.postman_collection.json,./e2e/3_2_Stories_Bugs.postman_collection.json,./e2e/4_Access_control.postman_collection.json
   kind_postman_collections: >-
