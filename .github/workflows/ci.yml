@@ -1,0 +1,26 @@
+name: CI
+
+on:
+  push:
+    branches:
+      - "**"
+    tags:
+      - "**"
+  pull_request:
+    types: [opened, reopened, synchronize]
+
+permissions:
+  contents: read
+  packages: write
+  pull-requests: read
+
+jobs:
+  ci:
+    uses: netcracker/qubership-apihub-ci/.github/workflows/monorepo-ci.yml@feat/monorepo-reusable-workflows
+    secrets: inherit
+    with:
+      modules-file: ci/modules.yaml
+      ci-store-repository: Netcracker/qubership-apihub-ci
+      ci-store-ref: feat/monorepo-reusable-workflows
+      run-e2e-compose: true
+      run-e2e-kind: true
