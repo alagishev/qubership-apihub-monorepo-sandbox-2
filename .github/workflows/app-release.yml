@@ -1,0 +1,22 @@
+name: Application release
+
+on:
+  workflow_dispatch:
+    inputs:
+      sprint-name:
+        description: "GitHub Project sprint / iteration name, e.g. APIHUB-26.3.3"
+        type: string
+        required: true
+
+permissions:
+  contents: write
+  packages: write
+
+jobs:
+  release:
+    uses: netcracker/qubership-apihub-ci/.github/workflows/monorepo-app-release.yml@feat/monorepo-reusable-workflows
+    secrets: inherit
+    with:
+      sprint-name: ${{ inputs.sprint-name }}
+      app-tag-prefix: qubership-apihub
+      helm-chart-path: helm-templates/qubership-apihub
