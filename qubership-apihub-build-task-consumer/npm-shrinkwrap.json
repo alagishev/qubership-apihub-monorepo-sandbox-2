@@ -14,9 +14,9 @@
         "@nestjs/config": "^4.0.4",
         "@nestjs/core": "^11.0.0",
         "@nestjs/platform-express": "^11.0.0",
-        "@netcracker/qubership-apihub-api-processor": "5.7.0",
-        "@sinclair/typebox": "^0.32.1",
-        "adm-zip": "^0.6.0",
+        "@netcracker/qubership-apihub-api-processor": "*",
+        "@sinclair/typebox": "^0.34.52",
+        "adm-zip": "0.6.0",
         "axios": "^1.6.2",
         "dotenv": "^16.3.1",
         "form-data": "^4.0.0",
@@ -2616,9 +2616,9 @@
       }
     },
     "node_modules/@sinclair/typebox": {
-      "version": "0.32.37",
-      "resolved": "https://registry.npmjs.org/@sinclair/typebox/-/typebox-0.32.37.tgz",
-      "integrity": "sha512-eRXD9qoShpUDPkNpvDdczhhHwO2GequnoItghgyPSqTZBW40W20TKrZuy0F73cSNVh5rYnLWj6BPneuaJMZlsw==",
+      "version": "0.34.52",
+      "resolved": "https://registry.npmjs.org/@sinclair/typebox/-/typebox-0.34.52.tgz",
+      "integrity": "sha512-XiMQh7qqVlxZzcVD+kkGMNGMzcTrDMLWI7S4x7z1MkCkbDPrekpZXEUK0eZqZFMuHQg2a2DZOcDIh9o5v3Gonw==",
       "license": "MIT"
     },
     "node_modules/@sinonjs/commons": {
@@ -3868,18 +3868,6 @@
       "license": "MIT",
       "engines": {
         "node": ">=14.0"
-      }
-    },
-    "node_modules/agent-base": {
-      "version": "6.0.2",
-      "resolved": "https://registry.npmjs.org/agent-base/-/agent-base-6.0.2.tgz",
-      "integrity": "sha512-RZNwNclF7+MS/8bDg70amg32dyeZGZxiDuQmZxKLAlQjr3jGyLx+4Kkk58UO7D2QdgFIQCovuSuZESne6RG6XQ==",
-      "license": "MIT",
-      "dependencies": {
-        "debug": "4"
-      },
-      "engines": {
-        "node": ">= 6.0.0"
       }
     },
     "node_modules/agent-base": {
