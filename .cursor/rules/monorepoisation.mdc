@@ -1,0 +1,35 @@
+---
+description: Log every monorepo migration step in monorepoisation/README.md without being asked.
+alwaysApply: true
+---
+
+# Monorepoisation log
+
+This checkout is the **sandbox** for folding polyrepos into one git repository. The same steps
+replay later in production, with a **larger, operator-supplied** source-repo list.
+
+## Do this without being asked
+
+When you **finish** a migration step (history import, GitHub workflows, APM, CODEOWNERS, CI,
+path rewrites, or similar), append a new numbered section to `monorepoisation/README.md`.
+Do not wait for the user to mention the log. Read that file first so you do not duplicate a step.
+
+## Each step section must include
+
+1. Ordinal number and short title
+2. One-paragraph summary of what changed
+3. Approximate agent wall-clock time, and what dominated (git, GitHub API, local edits)
+4. A **copy-paste prompt** in a fenced `markdown` block, ready for another clone
+
+## Prompt rules
+
+- Parameterise org, destination repo, root (umbrella) repo, and the **list of module repos**.
+  Never freeze this sandbox's repo names as the only set.
+- Put settled decisions in the prompt as requirements, not as questions to ask again.
+- Placeholders look like `<GITHUB_ORG>`, `<ROOT_REPO>`, `<MODULE_REPOS>`.
+
+## Do not
+
+- Invent future steps you did not perform
+- Hard-code a nine-repo roster
+- Skip the log because the user is in another agent or did not mention the README

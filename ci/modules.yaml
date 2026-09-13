@@ -1,0 +1,87 @@
+# Module map for monorepo CI. Reusable workflows in qubership-apihub-ci read this file
+# from the caller checkout. Paths are relative to the repository root.
+
+detect_paths:
+  commons-go:
+    - qubership-apihub-commons-go/**
+  backend:
+    - qubership-apihub-backend/**
+    - qubership-apihub-commons-go/**
+  ui:
+    - qubership-apihub-ui/**
+  build-task-consumer:
+    - qubership-apihub-build-task-consumer/**
+  api-linter-service:
+    - qubership-api-linter-service/**
+    - qubership-apihub-commons-go/**
+  agents-backend:
+    - qubership-apihub-agents-backend/**
+    - qubership-apihub-commons-go/**
+  postman:
+    - qubership-apihub-postman-collections/**
+  ui-tests:
+    - qubership-apihub-ui-tests/**
+  helm-compose:
+    - helm-templates/**
+    - docker-compose/**
+
+image_modules:
+  - id: backend
+    image_name: qubership-apihub-backend
+    dockerfile: qubership-apihub-backend/Dockerfile
+    context: "."
+    frontend_ci: false
+  - id: ui
+    image_name: qubership-apihub-ui
+    dockerfile: qubership-apihub-ui/Dockerfile
+    context: qubership-apihub-ui
+    frontend_ci: true
+    frontend_working_directory: qubership-apihub-ui
+  - id: build-task-consumer
+    image_name: qubership-apihub-build-task-consumer
+    dockerfile: qubership-apihub-build-task-consumer/Dockerfile
+    context: qubership-apihub-build-task-consumer
+    frontend_ci: true
+    frontend_working_directory: qubership-apihub-build-task-consumer
+  - id: api-linter-service
+    image_name: qubership-api-linter-service
+    dockerfile: qubership-api-linter-service/Dockerfile
+    context: "."
+    frontend_ci: false
+  - id: agents-backend
+    image_name: qubership-apihub-agents-backend
+    dockerfile: qubership-apihub-agents-backend/Dockerfile
+    context: "."
+    frontend_ci: false
+
+go_workspace:
+  modules:
+    - qubership-apihub-commons-go
+    - qubership-apihub-backend/qubership-apihub-service
+    - qubership-apihub-agents-backend/qubership-apihub-agents-backend
+    - qubership-api-linter-service/qubership-api-linter-service
+  local_replace: github.com/Netcracker/qubership-apihub-commons-go
+
+e2e:
+  compose_folder: docker-compose/apihub-generic
+  compose_file: docker-compose.yml
+  helm_chart: helm-templates/qubership-apihub
+  postman_path: qubership-apihub-postman-collections
+  playwright_path: qubership-apihub-ui-tests
+  fallback_registry: ghcr.io/netcracker
+  fallback_tag: dev
+  postman_collections: >-
+    ./e2e/1_1_Smoke_Portal.postman_collection.json,./e2e/1_3_Linter_Portal.postman_collection.json,./e2e/2_1_Negative_Portal.postman_collection.json,./e2e/3_1_Stories_Bugs.postman_collection.json,./e2e/3_2_Stories_Bugs.postman_collection.json,./e2e/4_Access_control.postman_collection.json
+  kind_postman_collections: >-
+    ./e2e/1_1_Smoke_Portal.postman_collection.json,./e2e/1_2_Smoke_Agent.postman_collection.json,./e2e/1_3_Linter_Portal.postman_collection.json,./e2e/2_1_Negative_Portal.postman_collection.json,./e2e/3_1_Stories_Bugs.postman_collection.json,./e2e/3_2_Stories_Bugs.postman_collection.json,./e2e/4_Access_control.postman_collection.json
+
+release:
+  app_tag_prefix: qubership-apihub
+  helm_chart_path: helm-templates/qubership-apihub
+  module_tag_prefixes:
+    - qubership-apihub-backend
+    - qubership-apihub-ui
+    - qubership-apihub-build-task-consumer
+    - qubership-api-linter-service
+    - qubership-apihub-agents-backend
+    - qubership-apihub-commons-go
