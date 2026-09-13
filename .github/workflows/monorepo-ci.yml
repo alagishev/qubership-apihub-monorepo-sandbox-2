@@ -47,7 +47,7 @@ jobs:
       any_image: ${{ steps.detect.outputs.any_image }}
       e2e_needed: ${{ steps.detect.outputs.e2e_needed }}
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
         with:
           fetch-depth: 0
       - name: List changed files
@@ -202,7 +202,7 @@ jobs:
       run:
         working-directory: qubership-apihub-commons-go
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
       - uses: actions/setup-go@v5
         with:
           go-version-file: qubership-apihub-commons-go/go.mod
@@ -228,7 +228,7 @@ jobs:
       agents_backend_image: ${{ steps.resolve.outputs.agents_backend_image }}
       image_refs_json: ${{ steps.resolve.outputs.image_refs_json }}
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
       - id: resolve
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
