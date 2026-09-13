@@ -147,3 +147,68 @@ caller checkout. Do not duplicate it inside workflow files.
   the library.
 ````
 
+### 3. Hoist GitHub hygiene, CODEOWNERS, and Dependabot
+
+**Summary:** GitHub only honours root `.github/CODEOWNERS` and `.github/dependabot.yml`. Merge
+per-module owners into path rules, list every `go.mod` / npm / Docker directory in Dependabot, hoist
+one copy of security-scan, delete-dist-tag, and the Playwright manual workflow, then delete nested
+`*/.github/workflows`, nested CODEOWNERS, and nested Dependabot files. Keep root CLA, labeler,
+conventional-commits, super-linter, and link-checker. Do not invent per-module CI wrappers yet.
+
+**Agent time (sandbox run):** about 20 minutes. Dominated by deleting nested workflow trees.
+
+**Prompt:**
+
+````markdown
+Adapt `.github` for a monorepo. Reusable workflow *sources* stay in `<CI_REPO>`. This repo only keeps
+thin wrappers and GitHub-native config that must live at the destination root.
+
+## Inputs
+
+- GitHub org: `<GITHUB_ORG>`
+- Destination: this repo
+- Root (umbrella) repo name: `<ROOT_REPO>`
+- Module repo names: `<MODULE_REPOS>`
+- CI store repo: `<CI_REPO>`
+
+## CODEOWNERS
+
+- Keep a default `* <default-owners>` rule from `<ROOT_REPO>`.
+- Add one path rule per module folder, copying owners from that module's old CODEOWNERS (root or
+  `.github/CODEOWNERS`).
+- Cover `/helm-templates/`, `/docker-compose/`, `/docs/`, `/ci/`, and `/.github/` with the umbrella
+  owners.
+
+## Dependabot
+
+- One `.github/dependabot.yml` at the destination root. Nested Dependabot files do nothing.
+- Add `gomod` entries for every `go.mod` directory, `npm` for every package-lock / shrinkwrap
+  directory, `docker` for every image-module Dockerfile directory, and `github-actions` at `/`.
+- Keep the existing commit-message prefix `chore: deps:` and the `dependencies` label.
+
+## Workflows
+
+- GitHub Actions only runs `.github/workflows` at the destination root. Delete every
+  `<module>/.github/workflows/**` file.
+- Keep the existing root hygiene wrappers (CLA, PR title, conventional commits, assigner, labeler,
+  super-linter, link-checker).
+- Hoist one `security-scan-apihub.yml` (discover GHCR packages for this repo).
+- Hoist `delete-dist-tag.yaml` as a thin `uses: <CI_REPO>/.../delete-dist-tag.yaml@main` wrapper.
+- Hoist the Playwright manual workflow with `defaults.run.working-directory` set to the ui-tests
+  module folder.
+- Leave smart Docker CI, E2E compose/kind orchestration, and Storybook CD for later steps (Storybook
+  needs a `working-directory` input on the reusable workflow first).
+
+## Do not
+
+- Call `docker-ci` from the monorepo yet.
+- Edit APM packages, Go Dockerfiles, or `go.work`.
+- Leave nested CODEOWNERS or Dependabot files behind.
+
+## Verify
+
+- `git ls-files '*/.github/workflows/*'` is empty.
+- `.github/CODEOWNERS` has a path rule for every folder in `<MODULE_REPOS>`.
+- `.github/dependabot.yml` directories match real `go.mod` / lockfile / Dockerfile paths.
+````
+

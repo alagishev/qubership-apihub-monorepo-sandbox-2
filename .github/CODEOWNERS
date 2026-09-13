@@ -3,10 +3,26 @@
 # List of approvers for this repository
 #
 #####################################################
-
 #
 # Learn about CODEOWNERS file format:
 #  https://help.github.com/en/articles/about-code-owners
 #
 
 * @alagishev
+
+/helm-templates/ @alagishev
+/docker-compose/ @alagishev
+/docs/ @alagishev
+/ci/ @alagishev
+/.github/ @alagishev
+
+/qubership-apihub-backend/ @alagishev @viacheslav-lunev @karpov-aleksandr
+/qubership-api-linter-service/ @alagishev @viacheslav-lunev @karpov-aleksandr
+/qubership-apihub-agents-backend/ @alagishev @viacheslav-lunev @karpov-aleksandr
+/qubership-apihub-commons-go/ @alagishev @viacheslav-lunev @karpov-aleksandr
+
+/qubership-apihub-ui/ @b41ex
+/qubership-apihub-ui-tests/ @b41ex
+/qubership-apihub-build-task-consumer/ @b41ex
+
+/qubership-apihub-postman-collections/ @alagishev
