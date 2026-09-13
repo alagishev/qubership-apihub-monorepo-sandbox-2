@@ -1,0 +1,149 @@
+# Monorepoisation
+
+Sandbox log of folding APIHUB polyrepos into one git repository. Replay these steps in the
+production monorepo. The operator supplies the source-repo list each time; do not treat any
+single run's roster as canonical.
+
+## How to use this log
+
+1. Copy the prompt from the step you need.
+2. Replace placeholders (`<GITHUB_ORG>`, `<ROOT_REPO>`, `<MODULE_REPOS>`, and the rest).
+3. After you finish a new step in this sandbox, append the next numbered section here.
+   Neighbouring agents must do that without being asked (see `.cursor/rules/monorepoisation.mdc`).
+
+This document is the draft of a reusable skill. Do not turn it into a skill until the sandbox
+run is complete.
+
+## Steps
+
+### 1. Import git history, tags, and GitHub releases
+
+**Summary:** Import the umbrella (root) repository 1:1 at the destination root, then `git subtree add`
+(no squash) each module into a top-level folder named after that GitHub repo. Keep `main` and
+`develop` only. Rename tags to `<repo>/<version>` (slash; git forbids `:` in ref names). Recreate
+GitHub releases with original notes, matching titles, prerelease/draft flags, and assets.
+
+**Agent time (sandbox run):** about 45 minutes after the approach was settled. Git import and push
+took ~7 minutes. GitHub releases (create, retries, asset copy, notes rewrite for Windows newlines)
+took ~37 minutes and dominate. Scale with module count for subtree add (typically under a minute
+each once fetched) and with release count for the API (~10–15 seconds each, plus retries).
+
+**Prompt:**
+
+````markdown
+Migrate several GitHub polyrepos into this repository as a monorepo. This checkout is the
+destination. Do not hard-code a fixed module list: use the operator-supplied lists below (or
+ask once for them if they are missing).
+
+## Inputs
+
+- GitHub org: `<GITHUB_ORG>`
+- Destination: this repo (already cloned; `origin` points at it)
+- Root (umbrella) repo name: `<ROOT_REPO>`
+  Content stays at the destination root (Helm, Compose, docs, and similar). Not a subfolder.
+- Module repo names: `<MODULE_REPOS>` — one GitHub repo name per line. Each name is the
+  destination top-level folder. Do not assume a nine-repo list.
+
+## Branches
+
+- Import only `main` and `develop` from each source, plus **all tags** (and the commits those
+  tags point at). Do not import other branches (`gh-pages`, `broadcast-*`, feature branches).
+- Root `main` → destination `main`.
+- If `<ROOT_REPO>` has no `develop`, create destination `develop` from the imported root `main`
+  **before** adding modules.
+- If `<ROOT_REPO>` has `develop`, import it onto destination `develop` the same way as `main`.
+- Then for each module: `git subtree add --prefix=<repo-name>` that module's `main` onto
+  destination `main`, and its `develop` onto destination `develop`. No `--squash` (old SHAs
+  stay as merge parents so historical tags still resolve).
+
+## Tags
+
+- Git ref names cannot contain `:`. Use `<repo-name>/<original-tag>` (slash).
+- Fetch tags with `--no-tags` on branch fetches, then
+  `git fetch --no-tags <remote> "refs/tags/*:refs/tags/<repo-name>/*"`.
+- Delete any unprefixed tags that slipped in via tag-following. Unprefixed `1.0.0` collides
+  across modules.
+- Keep original suffixes as-is (`alpha`, `beta`, `v0.0.1`, `0.0.1-test`).
+- Old module tags are historical: `git checkout <repo>/<version>` shows that repo's old layout
+  (files at the old root, not under the prefix). New tags after the monorepo exists will
+  snapshot the combined tree.
+
+## GitHub releases
+
+- After `git push -u origin main develop` and `git push origin --tags`, copy every GitHub
+  release from each source repo onto the destination.
+- Destination tag = `<repo-name>/<original-tag>`.
+- Destination **title must equal that prefixed tag** (the Releases list shows `name`, not
+  `tagName`).
+- Copy body 1:1 in UTF-8. Keep emoji. Do not rewrite links to old PRs/issues (those still live
+  on the source repos).
+- Preserve `prerelease` and `draft`. Copy release assets when present.
+- Create oldest-first. Mark `<ROOT_REPO>/<latest-root-version>` as GitHub Latest, not a module
+  tag GitHub might pick by semver.
+- Write notes files with UTF-8 and `newline='\n'`. On Windows, `Path.write_text` with default
+  newlines turns source CRLF into CRCRLF and inflates the body. After create, compare
+  normalised bodies; if they differ only by CR, rewrite with `gh release edit --notes-file`.
+- `gh api repos/.../releases/tags/<name>/<version>` breaks on the slash. Use
+  `gh release view "<name>/<version>"` instead.
+
+## Order of work
+
+1. Import root `main` (and `develop` if it exists) and prefixed root tags; create destination
+   `develop` if needed.
+2. For each module in the given list: fetch `main`/`develop`/tags, subtree-add onto both
+   destination branches, keep only prefixed tags.
+3. Verify: `git diff --stat src-<name>/main HEAD:<name>` is empty on `main`, and the same for
+   `develop`. Confirm zero unprefixed tags.
+4. Push `main`, `develop`, and tags.
+5. Recreate GitHub releases; verify titles equal prefixed tags and emoji still render.
+
+Do not start CI, APM, CODEOWNERS, or workflow adaptation in this step.
+````
+
+### 2. Write the monorepo CI module map
+
+**Summary:** GitHub Actions only runs workflows from the repository-root `.github/workflows`. Nested
+`*/.github/workflows` imported from the polyrepos are inert. Capture the module graph in
+`ci/modules.yaml` (image modules, path filters, Go workspace roots, E2E paths, tag prefixes) so later
+reusable workflows in `<CI_REPO>` can read it from the caller checkout. Do not invent a second copy of
+this map inside YAML workflows.
+
+**Agent time (sandbox run):** about 15 minutes. Dominated by reading existing polyrepo CI wrappers and
+the `docker-ci` / `calculate-effective-tag` contracts.
+
+**Prompt:**
+
+````markdown
+Create `ci/modules.yaml` at the destination root. It is the only module map later CI reads from the
+caller checkout. Do not duplicate it inside workflow files.
+
+## Inputs
+
+- GitHub org: `<GITHUB_ORG>`
+- Destination: this repo
+- Root (umbrella) repo name: `<ROOT_REPO>`
+- Module repo names: `<MODULE_REPOS>` — one GitHub repo name per line (top-level folders)
+- CI store repo: `<CI_REPO>` (reusable workflow sources; default `qubership-apihub-ci`)
+
+## Requirements
+
+- GitHub Actions does not run nested `*/.github/workflows`. Treat those files as dead until a later
+  hygiene step deletes them.
+- List every image-producing module with `image_name`, `dockerfile`, `context`, and whether it needs
+  frontend-ci (npm pack) first.
+- Go services that import `qubership-apihub-commons-go` must list that folder in `extra_paths` /
+  `detect_paths` so a commons-go change rebuilds those images.
+- Record E2E paths (`compose_folder`, `helm_chart`, `postman_path`, `playwright_path`).
+- Fallback image is `ghcr.io/netcracker/<image_name>:dev` when this branch never published a tag.
+- Module git tags stay `<module>/<semver>`. Application tags stay `<ROOT_REPO>/<semver>`.
+- Reusable workflow *sources* live in `<CI_REPO>`. This repo only grows thin wrappers later.
+- Do not rewrite workflows, APM, CODEOWNERS, or Dockerfiles in this step.
+
+## Verify
+
+- `ci/modules.yaml` lists every folder in `<MODULE_REPOS>` that produces an image, a Go library, or
+  E2E assets.
+- Path filters for each Go image include `qubership-apihub-commons-go/**` when that service imports
+  the library.
+````
+
