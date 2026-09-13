@@ -1,0 +1,21 @@
+name: Module release notes
+
+on:
+  push:
+    tags:
+      - "qubership-apihub-backend/*"
+      - "qubership-apihub-ui/*"
+      - "qubership-apihub-build-task-consumer/*"
+      - "qubership-api-linter-service/*"
+      - "qubership-apihub-agents-backend/*"
+      - "qubership-apihub-commons-go/*"
+
+permissions:
+  contents: write
+
+jobs:
+  notes:
+    uses: netcracker/qubership-apihub-ci/.github/workflows/monorepo-module-release.yml@feat/monorepo-reusable-workflows
+    secrets: inherit
+    with:
+      tag: ${{ github.ref_name }}
