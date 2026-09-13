@@ -47,7 +47,7 @@
     "@stoplight/spectral-functions": "1.7.1",
     "@stoplight/spectral-rulesets": "1.14.1",
     "@stoplight/types": "13.20.0",
-    "@stoplight/yaml": "4.2.3",
+    "@stoplight/yaml": "4.3.0",
     "@tanstack/react-query": "^4.43.0",
     "@tanstack/react-query-devtools": "^4.43.0",
     "@tanstack/react-table": "8.8.0",
