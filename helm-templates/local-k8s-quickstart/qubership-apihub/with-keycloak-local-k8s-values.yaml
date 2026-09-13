@@ -1,7 +1,7 @@
 qubershipApihubBackend:
   image:
-    repository: 'ghcr.io/netcracker/qubership-apihub-backend'
-    tag: 'dev'
+    repository: 'ghcr.io/alagishev/qubership-apihub-backend'
+    tag: 'main'
   replicas: 1
   resource:
     cpu:
@@ -43,8 +43,8 @@ qubershipApihubBackend:
 
 qubershipApihubBuildTaskConsumer:
   image:
-    repository: 'ghcr.io/netcracker/qubership-apihub-build-task-consumer'
-    tag: 'dev'
+    repository: 'ghcr.io/alagishev/qubership-apihub-build-task-consumer'
+    tag: 'main'
   replicas: 1
   resource:
     cpu:
@@ -60,8 +60,8 @@ qubershipApihubBuildTaskConsumer:
 
 qubershipApihubUi:
   image:
-    repository: 'ghcr.io/netcracker/qubership-apihub-ui'
-    tag: 'dev'
+    repository: 'ghcr.io/alagishev/qubership-apihub-ui'
+    tag: 'main'
   replicas: 1
   resource:
     cpu:
@@ -88,8 +88,8 @@ qubershipApihubUi:
 
 qubershipApiLinterService:
   image:
-    repository: 'ghcr.io/netcracker/qubership-api-linter-service'
-    tag: 'dev'
+    repository: 'ghcr.io/alagishev/qubership-api-linter-service'
+    tag: 'main'
   replicas: 1
   customCa:
     enabled: true
@@ -134,8 +134,8 @@ qubershipApiLinterService:
 qubershipApihubAgentsBackend:
   version: ''
   image:
-    repository: 'ghcr.io/netcracker/qubership-apihub-agents-backend'
-    tag: 'dev'
+    repository: 'ghcr.io/alagishev/qubership-apihub-agents-backend'
+    tag: 'main'
   customCa:
     enabled: true
     secretName: apihub-local-custom-ca

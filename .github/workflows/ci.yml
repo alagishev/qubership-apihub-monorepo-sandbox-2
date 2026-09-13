@@ -16,11 +16,9 @@ permissions:
 
 jobs:
   ci:
-    uses: netcracker/qubership-apihub-ci/.github/workflows/monorepo-ci.yml@feat/monorepo-reusable-workflows
+    uses: ./.github/workflows/monorepo-ci.yml
     secrets: inherit
     with:
       modules-file: ci/modules.yaml
-      ci-store-repository: Netcracker/qubership-apihub-ci
-      ci-store-ref: feat/monorepo-reusable-workflows
       run-e2e-compose: true
       run-e2e-kind: true
