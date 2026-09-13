@@ -461,6 +461,56 @@ Publish the umbrella Helm chart instead of asking users to copy it from a git ta
 - `permissions.packages: write` is required.
 ````
 
+### 11. Remove polyrepo GitHub leftover files from module folders
+
+**Summary:** GitHub Actions, Copilot custom instructions, super-linter, Dependabot, CODEOWNERS,
+and the security/contributing pages only read the destination root. After step 3 hoisted workflows,
+each module still carried `.github/linters`, `.github/instructions`, `super-linter.env`,
+`auto-labeler-config.yaml`, and (in one module) `release-drafter-config.yml`, plus duplicate
+`CONTRIBUTING.md`, `SECURITY.md`, and `CODE-OF-CONDUCT.md`. Those files do nothing in a monorepo,
+so they were deleted. APM sources (`agent-packages/`, `apm.yml`), compiled `AGENTS.md` /
+`.cursor` / `.claude`, licences, READMEs, and per-module `.editorconfig` stay.
+
+**Agent time (sandbox run):** about 15 minutes. Dominated by inventory and `git rm`.
+
+**Prompt:**
+
+````markdown
+Delete GitHub config that only worked in the old polyrepos. Keep product source, APM packages, and
+root `.github`.
+
+## Inputs
+
+- Destination: this repo
+- Module repo names: `<MODULE_REPOS>`
+
+## Delete in every module folder
+
+- The whole `<module>/.github/` tree (linters, Copilot `instructions/`, `super-linter.env`,
+  `auto-labeler-config.yaml`, release-drafter, leftover workflow fragments). GitHub never reads
+  nested `.github`.
+- Duplicate `<module>/CONTRIBUTING.md`, `<module>/SECURITY.md`, and `<module>/CODE-OF-CONDUCT.md`.
+  GitHub serves the copies at the destination root.
+
+## Keep
+
+- Root `.github/` (workflows, CODEOWNERS, Dependabot, linters, instructions).
+- Root `CONTRIBUTING.md`, `SECURITY.md`, `CODE-OF-CONDUCT.md`.
+- `<module>/agent-packages/`, `<module>/apm.yml`, compiled `AGENTS.md` / `.cursor` / `.claude`.
+- Licences, module READMEs, Dockerfiles, `.editorconfig`.
+
+## Do not
+
+- Delete `agent-packages/` or rewrite module READMEs in this step.
+- Touch reusable workflows in `<CI_REPO>`.
+
+## Verify
+
+- `git ls-files '*/.github/**'` is empty.
+- `git ls-files '*/CONTRIBUTING.md' '*/SECURITY.md' '*/CODE-OF-CONDUCT.md'` is empty.
+- Root `.github/workflows`, `.github/linters`, and `.github/CODEOWNERS` are unchanged.
+````
+
 ### Pins in this sandbox
 
 Destination wrappers currently call
