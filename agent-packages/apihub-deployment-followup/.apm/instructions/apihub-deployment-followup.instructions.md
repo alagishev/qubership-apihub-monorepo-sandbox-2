@@ -1,6 +1,6 @@
 ---
 description: Remind when backend changes require Helm or Compose updates in qubership-apihub.
-applyTo: "qubership-apihub-service/**/*.go,docs/api/**"
+applyTo: "qubership-apihub-backend/qubership-apihub-service/**/*.go,qubership-apihub-backend/docs/api/**"
 ---
 
 When implementing or modifying backend configuration, env-backed defaults, startup

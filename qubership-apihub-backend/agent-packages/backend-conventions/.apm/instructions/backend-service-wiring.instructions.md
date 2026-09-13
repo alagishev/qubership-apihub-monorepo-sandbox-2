@@ -1,6 +1,6 @@
 ---
 description: Service.go wiring conventions for qubership-apihub-backend
-applyTo: qubership-apihub-service/**/*.go
+applyTo: qubership-apihub-backend/qubership-apihub-service/**/*.go
 ---
 
 # Service.go Wiring

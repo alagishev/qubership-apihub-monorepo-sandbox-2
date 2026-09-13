@@ -1,6 +1,6 @@
 ---
 description: APIHUB UI TypeScript coding conventions.
-applyTo: "**/*.{ts,tsx}"
+applyTo: "qubership-apihub-ui/**/*.{ts,tsx}"
 ---
 
 # APIHUB UI authoring

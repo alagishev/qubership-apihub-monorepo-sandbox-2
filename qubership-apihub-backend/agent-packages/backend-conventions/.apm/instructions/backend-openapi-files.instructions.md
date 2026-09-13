@@ -1,6 +1,6 @@
 ---
 description: Backend OpenAPI file list and sync requirements
-applyTo: docs/api/**,qubership-apihub-service/controller/**
+applyTo: qubership-apihub-backend/docs/api/**,qubership-apihub-backend/qubership-apihub-service/controller/**
 ---
 
 # Backend OpenAPI Files

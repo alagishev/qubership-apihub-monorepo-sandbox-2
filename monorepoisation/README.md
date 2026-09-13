@@ -212,3 +212,63 @@ thin wrappers and GitHub-native config that must live at the destination root.
 - `.github/dependabot.yml` directories match real `go.mod` / lockfile / Dockerfile paths.
 ````
 
+### 4. Point APM at the monorepo root
+
+**Summary:** Root `apm.yml` now depends on every local `agent-packages/` tree plus the shared CI/AI
+store packages. Instruction `applyTo` globs are rooted at the destination root so a single
+`apm install` / `apm compile` covers backend, agents-backend, UI, Postman, and deployment.
+Module `apm.yml` files keep working for a checkout of one folder by using sibling `../`
+paths instead of old GitHub repo URLs.
+
+**Agent time (sandbox run):** about 25 minutes, dominated by `apm compile` scanning the tree.
+
+**Prompt:**
+
+````markdown
+Adapt APM for a monorepo. Compile from the destination root. Do not create new skills for this
+migration itself.
+
+## Inputs
+
+- Destination: this repo
+- Module repo names: `<MODULE_REPOS>`
+
+## Root manifest
+
+- Edit root `apm.yml` so `dependencies.apm` lists:
+  - shared store packages already used by the modules (english-developer-style,
+    markdown-line-length-120, development-conventions, go-conventions, apihub-go-developer,
+    apihub-go-self-review, github-ticket-implementation-planner)
+  - `./agent-packages/<name>` for umbrella packages
+  - `./<module>/agent-packages/<name>` for every module-local package
+- Keep `targets: [cursor, claude]`.
+
+## applyTo globs
+
+- Prefix every module-local `applyTo` with that module's top-level folder. Example:
+  `qubership-apihub-service/**/*.go` becomes
+  `qubership-apihub-backend/qubership-apihub-service/**/*.go`.
+- Do not leave a glob that matches another module's files (in particular `docs/api/**` and
+  `**/*.{ts,tsx}`).
+
+## Sibling dependencies
+
+- Replace GitHub URLs that pointed at another polyrepo's `agent-packages/` with relative paths
+  (`../agent-packages/…`, `../<module>/agent-packages/…`).
+
+## Compile
+
+From the destination root:
+
+```bash
+apm install --target cursor,claude --legacy-skill-paths --force
+apm compile --target cursor,claude
+```
+
+Commit the deployed `.cursor/`, `.claude/`, `AGENTS.md`, and `apm.lock.yaml` trees.
+
+## Do not
+
+- Change Dockerfiles, `go.work`, or GitHub Actions in this step.
+````
+
