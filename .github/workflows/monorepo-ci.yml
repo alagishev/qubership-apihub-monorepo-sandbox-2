@@ -201,7 +201,7 @@ jobs:
         working-directory: qubership-apihub-commons-go
     steps:
       - uses: actions/checkout@v6
-      - uses: actions/setup-go@v5
+      - uses: actions/setup-go@v7
         with:
           go-version-file: qubership-apihub-commons-go/go.mod
       - run: go test ./...
