@@ -6,6 +6,8 @@ Collection of Go modules and libraries for the Qubership API Hub ecosystem.
 
 `qubership-apihub-commons-go` is a collection of Go modules for the Qubership API Hub ecosystem. Each module is independent and can be used separately in your projects.
 
+This repository is a library. It does not ship an HTTP service of its own.
+
 ## Available Modules
 
 ### 📦 [api-spec-exposer](./api-spec-exposer)
