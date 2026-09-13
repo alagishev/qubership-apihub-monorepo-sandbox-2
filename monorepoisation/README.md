@@ -461,3 +461,16 @@ Publish the umbrella Helm chart instead of asking users to copy it from a git ta
 - `permissions.packages: write` is required.
 ````
 
+### Pins in this sandbox
+
+Destination wrappers currently call
+`<CI_REPO>/.github/workflows/…@feat/monorepo-reusable-workflows` and pass
+`ci-store-ref: feat/monorepo-reusable-workflows`. The CI-store change is
+[PR #74](https://github.com/Netcracker/qubership-apihub-ci/pull/74). After it
+merges, retarget every wrapper and `ci-store-ref` to `main`.
+
+Images built in this fork publish to `ghcr.io/${{ github.repository_owner }}/…`.
+E2E fallback images stay on `ghcr.io/netcracker/<image>:dev`. Compose and Kind
+E2E need the same secrets the polyrepo workflows used (`JWT_PRIVATE_KEY`,
+`APIHUB_ADMIN_EMAIL`, `APIHUB_ADMIN_PASSWORD`, `APIHUB_ACCESS_TOKEN`).
+
