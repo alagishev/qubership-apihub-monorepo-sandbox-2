@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Resolve each module image: this-run tag, else GHCR tag, else owner fallback."""
+"""Resolve each module image: this-run tag, else GHCR tag, else modules.yaml fallback."""
 
 from __future__ import annotations
 
@@ -8,6 +8,12 @@ import os
 import urllib.error
 import urllib.parse
 import urllib.request
+from pathlib import Path
+
+try:
+    import yaml
+except ImportError:
+    yaml = None
 
 MODULES = (
     ("backend", "qubership-apihub-backend"),
@@ -48,14 +54,32 @@ def ghcr_exists(repository: str, tag: str, actor: str, token: str) -> bool:
         return False
 
 
+def fallback_from_modules(modules_file: str) -> tuple[str, str]:
+    env_registry = os.environ.get("FALLBACK_REGISTRY", "")
+    env_tag = os.environ.get("FALLBACK_TAG", "")
+    if env_registry and env_tag:
+        return env_registry, env_tag
+    owner = os.environ.get("REGISTRY_OWNER", "")
+    default_registry = f"ghcr.io/{owner}" if owner else "ghcr.io/netcracker"
+    default_tag = os.environ.get("CURRENT_TAG", "dev")
+    if yaml is None or not Path(modules_file).is_file():
+        return default_registry, default_tag
+    cfg = yaml.safe_load(Path(modules_file).read_text(encoding="utf-8")) or {}
+    e2e = cfg.get("e2e") or {}
+    return (
+        e2e.get("fallback_registry") or default_registry,
+        e2e.get("fallback_tag") or default_tag,
+    )
+
+
 def main() -> int:
     actor = os.environ["GITHUB_ACTOR"]
     token = os.environ["GITHUB_TOKEN"]
     owner = os.environ["REGISTRY_OWNER"]
-    fallback_registry = os.environ.get("FALLBACK_REGISTRY", f"ghcr.io/{os.environ.get('REGISTRY_OWNER', '')}")
-    fallback_tag = os.environ.get("FALLBACK_TAG", os.environ.get("CURRENT_TAG", "main"))
+    fallback_registry, fallback_tag = fallback_from_modules(os.environ.get("MODULES_FILE", "ci/modules.yaml"))
     current_tag = os.environ["CURRENT_TAG"]
     built = json.loads(os.environ.get("BUILT_JSON", "{}"))
+    print(f"fallback={fallback_registry} tag={fallback_tag} current={current_tag}")
     refs = {}
     for key, image_name in MODULES:
         built_tag = built.get(key) or ""
