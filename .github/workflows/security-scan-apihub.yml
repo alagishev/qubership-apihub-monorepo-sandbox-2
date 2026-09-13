@@ -86,7 +86,7 @@ jobs:
         package: ${{ fromJson(needs.debug-packages.outputs.packages) }}
 
     name: "Run Security Scan (matrix)"
-    uses: netcracker/qubership-workflow-hub/.github/workflows/re-security-scan.yml@396774180000abdb825cbf150b56cc59c6913db8 #v2.0.5
+    uses: netcracker/qubership-workflow-hub/.github/workflows/re-security-scan.yml@4ce44398bac0a6f82e55aeb4a753aada3530de5b #v2.7.1
     with:
       target: ${{ inputs.target || 'docker' }}
       image: ${{ format('{0}:{1}', matrix.package.path, inputs.tag || 'dev') }}
@@ -95,7 +95,7 @@ jobs:
     needs: debug-packages
     if: ${{ inputs.image != '' && inputs.image != null }}
     name: "Run Security Scan (single image)"
-    uses: netcracker/qubership-workflow-hub/.github/workflows/re-security-scan.yml@396774180000abdb825cbf150b56cc59c6913db8 #v2.0.5
+    uses: netcracker/qubership-workflow-hub/.github/workflows/re-security-scan.yml@4ce44398bac0a6f82e55aeb4a753aada3530de5b #v2.7.1
     with:
       target: ${{ inputs.target || 'docker' }}
       image: ${{ inputs.image }}
