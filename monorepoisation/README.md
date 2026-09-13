@@ -571,6 +571,64 @@ In the destination `.github/linters/.checkov.yaml` (local file wins over the org
 - Link checker does not report the retargeted contributing/overview links.
 ````
 
+### 13. Pass secrets by name into CI-store workflows; rebuild only changed images
+
+**Summary:** `secrets: inherit` does not reach reusable workflows in another GitHub org, so
+`NPMRC` never arrived in `docker-ci` and npm packed from `registry.npmjs.org`. Named
+`secrets: NPMRC` / `GH_ACCESS_TOKEN` on each `uses: <CI_REPO>/.../docker-ci.yml` call. Docker
+jobs no longer treat `e2e_needed` as "rebuild every image"; unchanged modules use
+`e2e.fallback_registry` / `e2e.fallback_tag` from `ci/modules.yaml` (`ghcr.io/netcracker` / `dev`).
+
+**Agent time (sandbox run):** about 15 minutes. Dominated by reading GitHub inherit rules and the
+last CI logs.
+
+**Prompt:**
+
+````markdown
+When the destination calls reusable Docker/frontend workflows in `<CI_REPO>` and that store lives
+in another GitHub organisation, do not use `secrets: inherit`. Pass repository secrets by name.
+
+## Inputs
+
+- GitHub org: `<GITHUB_ORG>`
+- Destination: this repo
+- CI store repo: `<CI_REPO>`
+
+## Secrets
+
+On every `uses: <CI_REPO>/.github/workflows/docker-ci.yml@<CI_REF>` job, set:
+
+```yaml
+secrets:
+  NPMRC: ${{ secrets.NPMRC }}
+  GH_ACCESS_TOKEN: ${{ secrets.GH_ACCESS_TOKEN }}
+```
+
+`GITHUB_TOKEN` stays implicit. Same-repo nested workflows (compose/kind E2E) may keep
+`secrets: inherit`.
+
+## Image rebuild vs end-to-end
+
+- Rebuild a Docker image only when detect marks that module (including `detect_paths` cascade,
+  e.g. commons-go → backend / linter / agents-backend).
+- Do not use `e2e_needed` in those `if:` conditions.
+- Keep `e2e_needed` as the switch for compose/kind and `resolve-images`.
+- Resolve: image from this run, else GHCR `<owner>:<current-tag>`, else
+  `e2e.fallback_registry` / `e2e.fallback_tag` in `ci/modules.yaml`.
+
+## Do not
+
+- Copy `<CI_REPO>` into the destination to "fix" inherit.
+- Publish frontend packages with `GITHUB_TOKEN` of a fork into `<GITHUB_ORG>` npm; Docker
+  `npm pack` of `@netcracker/...` needs `NPMRC` that can read that org’s GitHub Packages.
+
+## Verify
+
+- A commons-go-only PR rebuilds backend, linter, and agents-backend, skips UI and BTC Docker,
+  and still schedules end-to-end.
+- The UI Docker build log shows `npm pack` hitting `npm.pkg.github.com`, not `registry.npmjs.org`.
+````
+
 ### Pins in this sandbox
 
 Destination wrappers currently call

@@ -1,7 +1,8 @@
 name: Monorepo CI
 
-# Sandbox copy of the CI-store reusable. Image publish and E2E fallback use
-# github.repository_owner (alagishev), not ghcr.io/netcracker.
+# Sandbox copy of the CI-store reusable. Images built here publish to
+# ghcr.io/${{ github.repository_owner }}. Unchanged modules fall back to
+# e2e.fallback_registry / e2e.fallback_tag in ci/modules.yaml.
 
 on:
   workflow_call:
@@ -105,7 +106,6 @@ jobs:
     needs: detect
     if: needs.detect.outputs.ui == 'true'
     uses: netcracker/qubership-apihub-ci/.github/workflows/frontend-ci.yaml@feat/monorepo-reusable-workflows
-    secrets: inherit
     with:
       working-directory: qubership-apihub-ui
 
@@ -113,15 +113,16 @@ jobs:
     needs: detect
     if: needs.detect.outputs.build_task_consumer == 'true'
     uses: netcracker/qubership-apihub-ci/.github/workflows/frontend-ci.yaml@feat/monorepo-reusable-workflows
-    secrets: inherit
     with:
       working-directory: qubership-apihub-build-task-consumer
 
   docker-backend:
     needs: [detect, compute-tag]
-    if: needs.detect.outputs.backend == 'true' || needs.detect.outputs.e2e_needed == 'true'
+    if: needs.detect.outputs.backend == 'true'
     uses: netcracker/qubership-apihub-ci/.github/workflows/docker-ci.yml@feat/monorepo-reusable-workflows
-    secrets: inherit
+    secrets:
+      NPMRC: ${{ secrets.NPMRC }}
+      GH_ACCESS_TOKEN: ${{ secrets.GH_ACCESS_TOKEN }}
     with:
       name: qubership-apihub-backend
       file: qubership-apihub-backend/Dockerfile
@@ -136,9 +137,11 @@ jobs:
   # published image tag as TAG, and PR refs (pull-N-merge) are not on npm.
   docker-ui:
     needs: [detect, compute-tag]
-    if: needs.detect.outputs.ui == 'true' || needs.detect.outputs.e2e_needed == 'true'
+    if: needs.detect.outputs.ui == 'true'
     uses: netcracker/qubership-apihub-ci/.github/workflows/docker-ci.yml@feat/monorepo-reusable-workflows
-    secrets: inherit
+    secrets:
+      NPMRC: ${{ secrets.NPMRC }}
+      GH_ACCESS_TOKEN: ${{ secrets.GH_ACCESS_TOKEN }}
     with:
       name: qubership-apihub-ui
       file: qubership-apihub-ui/Dockerfile
@@ -151,9 +154,11 @@ jobs:
 
   docker-btc:
     needs: [detect, compute-tag]
-    if: needs.detect.outputs.build_task_consumer == 'true' || needs.detect.outputs.e2e_needed == 'true'
+    if: needs.detect.outputs.build_task_consumer == 'true'
     uses: netcracker/qubership-apihub-ci/.github/workflows/docker-ci.yml@feat/monorepo-reusable-workflows
-    secrets: inherit
+    secrets:
+      NPMRC: ${{ secrets.NPMRC }}
+      GH_ACCESS_TOKEN: ${{ secrets.GH_ACCESS_TOKEN }}
     with:
       name: qubership-apihub-build-task-consumer
       file: qubership-apihub-build-task-consumer/Dockerfile
@@ -166,9 +171,11 @@ jobs:
 
   docker-linter:
     needs: [detect, compute-tag]
-    if: needs.detect.outputs.api_linter_service == 'true' || needs.detect.outputs.e2e_needed == 'true'
+    if: needs.detect.outputs.api_linter_service == 'true'
     uses: netcracker/qubership-apihub-ci/.github/workflows/docker-ci.yml@feat/monorepo-reusable-workflows
-    secrets: inherit
+    secrets:
+      NPMRC: ${{ secrets.NPMRC }}
+      GH_ACCESS_TOKEN: ${{ secrets.GH_ACCESS_TOKEN }}
     with:
       name: qubership-api-linter-service
       file: qubership-api-linter-service/Dockerfile
@@ -181,9 +188,11 @@ jobs:
 
   docker-agents:
     needs: [detect, compute-tag]
-    if: needs.detect.outputs.agents_backend == 'true' || needs.detect.outputs.e2e_needed == 'true'
+    if: needs.detect.outputs.agents_backend == 'true'
     uses: netcracker/qubership-apihub-ci/.github/workflows/docker-ci.yml@feat/monorepo-reusable-workflows
-    secrets: inherit
+    secrets:
+      NPMRC: ${{ secrets.NPMRC }}
+      GH_ACCESS_TOKEN: ${{ secrets.GH_ACCESS_TOKEN }}
     with:
       name: qubership-apihub-agents-backend
       file: qubership-apihub-agents-backend/Dockerfile
@@ -233,10 +242,9 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GITHUB_ACTOR: ${{ github.actor }}
+          MODULES_FILE: ${{ inputs.modules-file }}
           REGISTRY_OWNER: ${{ needs.compute-tag.outputs.registry_owner }}
           CURRENT_TAG: ${{ needs.compute-tag.outputs.tag }}
-          FALLBACK_REGISTRY: ghcr.io/${{ needs.compute-tag.outputs.registry_owner }}
-          FALLBACK_TAG: ${{ needs.compute-tag.outputs.tag }}
           BUILT_JSON: >-
             {
               "backend": "${{ needs.docker-backend.result == 'success' && needs.docker-backend.outputs.image_tag || '' }}",
@@ -245,7 +253,9 @@ jobs:
               "api_linter_service": "${{ needs.docker-linter.result == 'success' && needs.docker-linter.outputs.image_tag || '' }}",
               "agents_backend": "${{ needs.docker-agents.result == 'success' && needs.docker-agents.outputs.image_tag || '' }}"
             }
-        run: python3 .github/workflows/scripts/monorepo_resolve_images.py
+        run: |
+          pip install --quiet pyyaml
+          python3 .github/workflows/scripts/monorepo_resolve_images.py
 
   e2e-compose:
     needs: [detect, resolve-images]
